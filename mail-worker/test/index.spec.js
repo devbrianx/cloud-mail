@@ -43,6 +43,12 @@ describe('temporary inbox API', () => {
 		expect((await response.json()).errorCode).toBe('api_disabled');
 	});
 
+
+	it('includes configured domains in the public website configuration', async () => {
+		const response = await request('/api/setting/websiteConfig');
+		expect(response.status).toBe(200);
+		expect((await response.json()).data.domainList).toEqual(['@example.com', '@alt.example.com']);
+	});
 	it('creates only valid keys and never stores their plaintext secret', async () => {
 		const context = { env, get() { return undefined; }, set() {} };
 		const created = await apiKeyService.create(context, 1, { name: 'automation', scopes: ['inboxes:read'] });
