@@ -7,6 +7,8 @@ const tempInbox = sqliteTable('temp_inbox', {
 	userId: integer('user_id').notNull(),
 	address: text('address').notNull(),
 	domain: text('domain').notNull(),
+	mode: text('mode').default('fixed').notNull(),
+	subdomain: text('subdomain').default('').notNull(),
 	createTime: text('create_time').default(sql`CURRENT_TIMESTAMP`).notNull(),
 	expiresAt: text('expires_at').notNull(),
 	deletedAt: text('deleted_at')

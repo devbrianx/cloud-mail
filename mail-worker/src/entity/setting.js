@@ -53,6 +53,7 @@ export const setting = sqliteTable('setting', {
 	aiCode: integer('ai_code').default(1).notNull(),
 	aiCodeFilter: text('ai_code_filter').default('').notNull(),
 	apiEnabled: integer('api_enabled').default(1).notNull(),
-	apiDomains: text('api_domains').default('').notNull()
+	apiDomains: text('api_domains').default('').notNull(),
+	apiWildcardDomains: text('api_wildcard_domains').default('').notNull()
 });
 export default setting

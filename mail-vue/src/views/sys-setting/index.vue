@@ -654,12 +654,19 @@
       </el-dialog>
       <el-dialog v-model="apiDomainsShow" :title="$t('apiDomains')" width="500" @closed="resetApiDomainsDraft">
         <p class="api-domains-help">{{ $t('apiDomainsDesc') }}</p>
+        <p class="api-domains-help">{{ $t('apiWildcardDomainsDesc') }}</p>
         <el-table :data="apiDomainOptions" :empty-text="$t('apiDomainsEmpty')">
           <el-table-column prop="domain" :label="$t('domain')"/>
           <el-table-column :label="$t('apiDomainStatus')" width="150">
             <template #default="{ row }">
               <el-switch :model-value="apiDomainsDraft.includes(row.domain)" :active-text="$t('enable')"
                          :inactive-text="$t('disable')" @change="setApiDomain(row.domain, $event)"/>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('apiWildcardDomains')" width="150">
+            <template #default="{ row }">
+              <el-switch :disabled="!apiDomainsDraft.includes(row.domain)" :model-value="apiWildcardDomainsDraft.includes(row.domain)" :active-text="$t('enable')"
+                         :inactive-text="$t('disable')" @change="setApiWildcardDomain(row.domain, $event)"/>
             </template>
           </el-table-column>
         </el-table>
@@ -987,6 +994,7 @@ const tgMsgTextOption = [{label: t('show'), value: 'show'}, {label: t('hide'), v
 const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px');
 	const apiDomains = ref([])
 	const apiDomainsDraft = ref([])
+	const apiWildcardDomainsDraft = ref([])
 	const apiDomainsShow = ref(false)
 	const apiDomainOptions = computed(() => settingStore.domainList.map(domain => ({ domain: domain.slice(1) })))
 
@@ -1016,6 +1024,7 @@ function getSettings() {
       settingReady.value = true
     })
     apiDomains.value = settingData.apiDomains || []
+    apiWildcardDomainsDraft.value = [...(settingData.apiWildcardDomains || [])]
   })
 }
 
@@ -1502,28 +1511,39 @@ function change(e) {
 }
 
 	function saveApiSettings() {
-	  editSetting({apiEnabled: setting.value.apiEnabled, apiDomains: apiDomains.value})
+	  editSetting({apiEnabled: setting.value.apiEnabled, apiDomains: apiDomains.value, apiWildcardDomains: apiWildcardDomainsDraft.value})
 	}
 
 	function openApiDomains() {
 	  apiDomainsDraft.value = [...apiDomains.value]
+	  apiWildcardDomainsDraft.value = [...(setting.value.apiWildcardDomains || [])]
 	  apiDomainsShow.value = true
 	}
 
 	function resetApiDomainsDraft() {
 	  apiDomainsDraft.value = []
+	  apiWildcardDomainsDraft.value = []
 	}
 
 	function setApiDomain(domain, enabled) {
 	  if (enabled && !apiDomainsDraft.value.includes(domain)) apiDomainsDraft.value.push(domain)
-	  if (!enabled) apiDomainsDraft.value = apiDomainsDraft.value.filter(item => item !== domain)
+	  if (!enabled) {
+	    apiDomainsDraft.value = apiDomainsDraft.value.filter(item => item !== domain)
+	    apiWildcardDomainsDraft.value = apiWildcardDomainsDraft.value.filter(item => item !== domain)
+	  }
+	}
+
+	function setApiWildcardDomain(domain, enabled) {
+	  if (enabled && !apiWildcardDomainsDraft.value.includes(domain)) apiWildcardDomainsDraft.value.push(domain)
+	  if (!enabled) apiWildcardDomainsDraft.value = apiWildcardDomainsDraft.value.filter(item => item !== domain)
 	}
 
 	function saveApiDomains() {
 	  if (settingLoading.value) return
 	  settingLoading.value = true
-	  settingSet({apiEnabled: setting.value.apiEnabled, apiDomains: apiDomainsDraft.value}).then(() => {
+	  settingSet({apiEnabled: setting.value.apiEnabled, apiDomains: apiDomainsDraft.value, apiWildcardDomains: apiWildcardDomainsDraft.value}).then(() => {
 	    apiDomains.value = [...apiDomainsDraft.value]
+	    setting.value.apiWildcardDomains = [...apiWildcardDomainsDraft.value]
 	    apiDomainsShow.value = false
 	    ElMessage({message: t('saveSuccessMsg'), type: 'success', plain: true})
 	  }).finally(() => {
@@ -1531,35 +1551,6 @@ function change(e) {
 	  })
 	}
 
-function openApiDomains() {
-  apiDomainsDraft.value = [...apiDomains.value]
-  apiDomainsShow.value = true
-}
-
-function resetApiDomainsDraft() {
-  apiDomainsDraft.value = []
-}
-
-function setApiDomain(domain, enabled) {
-  if (enabled && !apiDomainsDraft.value.includes(domain)) apiDomainsDraft.value.push(domain)
-  if (!enabled) apiDomainsDraft.value = apiDomainsDraft.value.filter(item => item !== domain)
-}
-
-function saveApiDomains() {
-  if (settingLoading.value) return
-  settingLoading.value = true
-  settingSet({apiEnabled: setting.value.apiEnabled, apiDomains: apiDomainsDraft.value}).then(() => {
-    apiDomains.value = [...apiDomainsDraft.value]
-    apiDomainsShow.value = false
-    ElMessage({message: t('saveSuccessMsg'), type: 'success', plain: true})
-  }).finally(() => {
-    settingLoading.value = false
-  })
-}
-
-function saveTitle() {
-  editSetting({title: editTitle.value})
-}
 
 function jump(href) {
   const doc = document.createElement('a')

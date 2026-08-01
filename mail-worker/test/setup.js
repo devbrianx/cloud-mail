@@ -10,6 +10,9 @@ const schema = [
 	`DROP TABLE IF EXISTS temp_message`,
 	`DROP TABLE IF EXISTS temp_inbox`,
 	`DROP TABLE IF EXISTS api_key`,
+	`DROP TABLE IF EXISTS temp_token`,
+	`DROP TABLE IF EXISTS api_key_usage`,
+	`DROP TABLE IF EXISTS temp_api_migration`,
 	`DROP TABLE IF EXISTS attachments`,
 	`DROP TABLE IF EXISTS verify_record`,
 	`DROP TABLE IF EXISTS setting`,
@@ -21,10 +24,12 @@ const schema = [
 	`CREATE TABLE role (role_id INTEGER PRIMARY KEY, name TEXT NOT NULL, key TEXT, description TEXT, ban_email TEXT NOT NULL DEFAULT '', ban_email_type INTEGER NOT NULL DEFAULT 0, avail_domain TEXT NOT NULL DEFAULT '', sort INTEGER DEFAULT 0, is_default INTEGER DEFAULT 0, send_count INTEGER, send_type TEXT NOT NULL DEFAULT 'count', account_count INTEGER)`,
 	`CREATE TABLE perm (perm_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, perm_key TEXT, pid INTEGER NOT NULL DEFAULT 0, type INTEGER NOT NULL DEFAULT 2, sort REAL)`,
 	`CREATE TABLE role_perm (id INTEGER PRIMARY KEY AUTOINCREMENT, role_id INTEGER, perm_id INTEGER)`,
-	`CREATE TABLE api_key (api_key_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL, secret_hash TEXT NOT NULL UNIQUE, secret_prefix TEXT NOT NULL, scopes TEXT NOT NULL, revoked_at TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-	`CREATE TABLE temp_inbox (temp_inbox_id TEXT PRIMARY KEY, api_key_id INTEGER NOT NULL, user_id INTEGER NOT NULL, address TEXT NOT NULL UNIQUE COLLATE NOCASE, domain TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, expires_at TEXT NOT NULL, deleted_at TEXT)`,
-	`CREATE TABLE temp_message (temp_message_id INTEGER PRIMARY KEY AUTOINCREMENT, temp_inbox_id TEXT NOT NULL, send_email TEXT, name TEXT, subject TEXT, text TEXT, content TEXT, recipient TEXT NOT NULL DEFAULT '[]', cc TEXT NOT NULL DEFAULT '[]', message_id TEXT NOT NULL DEFAULT '', unread INTEGER NOT NULL DEFAULT 0, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, is_deleted INTEGER NOT NULL DEFAULT 0)`,
-	`CREATE TABLE temp_attachment (temp_attachment_id INTEGER PRIMARY KEY AUTOINCREMENT, temp_message_id INTEGER NOT NULL, key TEXT NOT NULL, filename TEXT, mime_type TEXT, size INTEGER, disposition TEXT, content_id TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
+	`CREATE TABLE api_key (api_key_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL, secret_hash TEXT NOT NULL UNIQUE, secret_prefix TEXT NOT NULL, scopes TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+	`CREATE TABLE temp_inbox (temp_inbox_id TEXT PRIMARY KEY, api_key_id INTEGER NOT NULL, user_id INTEGER NOT NULL, address TEXT NOT NULL UNIQUE COLLATE NOCASE, domain TEXT NOT NULL, mode TEXT NOT NULL DEFAULT 'fixed', subdomain TEXT NOT NULL DEFAULT '', create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, expires_at TEXT NOT NULL, deleted_at TEXT)`,
+	`CREATE TABLE temp_message (temp_message_id INTEGER PRIMARY KEY AUTOINCREMENT, temp_inbox_id TEXT NOT NULL, send_email TEXT, name TEXT, subject TEXT, text TEXT, content TEXT, recipient TEXT NOT NULL DEFAULT '[]', cc TEXT NOT NULL DEFAULT '[]', message_id TEXT NOT NULL DEFAULT '', unread INTEGER NOT NULL DEFAULT 0, raw_source TEXT NOT NULL DEFAULT '', size INTEGER NOT NULL DEFAULT 0, starred INTEGER NOT NULL DEFAULT 0, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, is_deleted INTEGER NOT NULL DEFAULT 0)`,
+	`CREATE TABLE temp_attachment (temp_attachment_id INTEGER PRIMARY KEY AUTOINCREMENT, temp_message_id INTEGER NOT NULL, key TEXT NOT NULL, filename TEXT, mime_type TEXT, size INTEGER, disposition TEXT, content_id TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+	`CREATE TABLE temp_token (token_hash TEXT PRIMARY KEY, temp_inbox_id TEXT NOT NULL, expires_at TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+	`CREATE TABLE api_key_usage (api_key_id INTEGER NOT NULL, usage_date TEXT NOT NULL, call_count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(api_key_id, usage_date))`
 ];
 
 beforeEach(async () => {
@@ -40,7 +45,7 @@ beforeEach(async () => {
 		notice: 1, noRecipient: 1, loginDomain: 0, bucket: '', region: '', endpoint: '',
 		s3AccessKey: '', s3SecretKey: '', forcePathStyle: 1, customDomain: '', tgMsgFrom: 'only-name',
 		tgMsgTo: 'show', tgMsgText: 'hide', minEmailPrefix: 0, emailPrefixFilter: '', apiEnabled: 0,
-		apiDomains: ['example.com']
+		apiDomains: ['example.com', 'alt.example.com'], apiWildcardDomains: ['example.com']
 	}));
 	await env.db.prepare(`INSERT INTO role (role_id, name, key) VALUES (1, 'test', '')`).run();
 	await env.db.prepare(`INSERT INTO user (user_id, email, type) VALUES (1, 'user@example.com', 1), (2, 'admin@example.com', 1)`).run();

@@ -8,6 +8,6 @@ export function apiKeyCreate(form) {
   return http.post('/apiKey/create', form);
 }
 
-export function apiKeyRevoke(apiKeyId) {
+export function apiKeyDelete(apiKeyId) {
   return http.delete(`/apiKey/${apiKeyId}`);
 }

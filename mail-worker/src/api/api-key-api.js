@@ -18,6 +18,6 @@ app.delete('/apiKey/:apiKeyId', async c => {
 	if (!Number.isInteger(apiKeyId) || apiKeyId < 1) {
 		return c.json(result.fail('API key id is invalid', 400));
 	}
-	await apiKeyService.revoke(c, userContext.getUserId(c), apiKeyId);
+	await apiKeyService.delete(c, userContext.getUserId(c), apiKeyId);
 	return c.json(result.ok());
 });

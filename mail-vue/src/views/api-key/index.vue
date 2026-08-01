@@ -20,10 +20,11 @@
         </template>
       </el-table-column>
       <el-table-column prop="createTime" :label="$t('date')" min-width="180" />
-      <el-table-column :label="$t('action')" width="120">
+      <el-table-column prop="todayCalls" :label="$t('apiKeyTodayCalls')" width="110" />
+      <el-table-column prop="last30DaysCalls" :label="$t('apiKeyLast30DaysCalls')" width="130" />
+      <el-table-column :label="$t('action')" width="150">
         <template #default="{ row }">
-          <el-tag v-if="row.revokedAt" type="info">{{ $t('apiKeyRevoked') }}</el-tag>
-          <el-button v-else type="danger" link @click="revoke(row)">{{ $t('revokeApiKey') }}</el-button>
+          <el-button type="danger" link @click="deleteKey(row)">{{ $t('deleteApiKey') }}</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -64,7 +65,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { apiKeyCreate, apiKeyList, apiKeyRevoke } from '@/request/api-key.js';
+import { apiKeyCreate, apiKeyList, apiKeyDelete } from '@/request/api-key.js';
 import { useI18n } from 'vue-i18n';
 
 const { t, locale } = useI18n();
@@ -95,97 +96,45 @@ function buildGuide(origin) {
 
 Base URL: ${origin}/v1
 
-此 API 用于创建和管理仅 API 可见的临时邮箱；邮箱、邮件和附件将在创建 24 小时后删除。使用前，管理员必须在系统设置启用临时邮箱 API、配置可用域名，并在权限控制中为你的角色授予“API 密钥”。在网页“API 密钥”创建密钥后仅会显示一次，请安全保存。
+使用 AC- API 密钥创建临时邮箱。创建成功会返回仅属于该邮箱的临时 Bearer token；临时 token 可用于后续读取同一邮箱、刷新 token、读取邮件、更新状态、删除及下载附件。管理员必须先启用 API、配置 API 域名，并可额外标记已经配置 Cloudflare Email Routing 通配 MX 的通配域。
 
 ## 认证
-每个请求必须带：\nX-API-Key: cm_your_api_key
-请仅将 cm_your_api_key 替换成你创建时复制的真实密钥；不要使用浏览器登录 Token。
-
-## 权限范围
-- inboxes:read：${labels['inboxes:read']}；查看本密钥创建的邮箱。
-- inboxes:write：${labels['inboxes:write']}；创建、删除本密钥创建的邮箱。
-- messages:read：${labels['messages:read']}；查看邮件及下载附件。
-- messages:write：${labels['messages:write']}；标记已读状态和删除邮件。
+创建或 API 密钥操作：\nX-API-Key: AC_your_api_key
+临时 token 操作：\nAuthorization: Bearer TEMP_TOKEN
 
 ## 接口
-- POST /inboxes（inboxes:write）：创建邮箱。JSON: {"domain":"允许的域名","localPart":"可选小写前缀"}。domain 必须是管理员允许的域名；localPart 省略时服务器随机生成。
-- GET /inboxes（inboxes:read）：列出本密钥创建且未过期的邮箱。
-- GET /inboxes/{id}（inboxes:read）：查看邮箱及邮件数量。
-- DELETE /inboxes/{id}（inboxes:write）：删除邮箱、其邮件与附件。
-- GET /inboxes/{id}/messages?limit=50&seen=true&after_id=123（messages:read）：分页列出邮件。limit 为 1-100；seen 可为 true/false；after_id 为下一页游标。
-- GET /messages/{id}（messages:read）：获取邮件正文和附件下载地址。
-- PATCH /messages/{id}（messages:write）：JSON 必须为 {"seen":true}。
-- DELETE /messages/{id}（messages:write）：删除邮件及附件。
-- GET /messages/{id}/attachments/{attachmentId}（messages:read）：下载附件。
+- POST /accounts（inboxes:write）：创建固定临时邮箱，JSON 支持 localPart、address、domain。
+- POST /accounts/wildcard（inboxes:write）：创建通配子域邮箱，JSON 支持 domain、subdomain、localPart。域必须已启用通配能力。
+- POST /inboxes：兼容别名，已弃用；使用 /accounts。
+- GET /accounts/me、POST /token：仅临时 token；刷新时提供 address。
+- GET /inboxes/{id}；GET/DELETE /accounts/{id}（后者为兼容别名）。
+- GET /messages?address=邮箱，或 GET /inboxes/{id}/messages；支持 limit、offset、seen、since、q、after_id。
+- GET /messages/next?address=邮箱；POST /messages/mark-read?address=邮箱。
+- GET/PATCH/DELETE /messages/{id}?address=邮箱；PATCH 支持 seen、starred。
+- GET /sources/{id}?address=邮箱返回原始 RFC 822；附件 URL 为 /messages/{id}/attachments/{attachmentId}。
 
-## 响应与访问边界
-成功：{"success":true,"data":...}；失败：{"success":false,"error":"...","errorCode":"..."}。401 表示密钥无效或已撤销；403 表示 API 未启用或 scope 不足；404 表示资源不存在、已过期、已删除或不属于此密钥；409 表示邮箱地址冲突。一个密钥只能访问它自己创建的临时邮箱，即使另一个密钥属于同一用户也不能访问。
-
-## curl 示例
-\`\`\`bash
-KEY='cm_your_api_key'
-BASE='${origin}/v1'
-# 创建邮箱
-curl -X POST "$BASE/inboxes" -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d '{"domain":"example.com","localPart":"demo"}'
-# 列出邮件
-curl "$BASE/inboxes/INBOX_ID/messages?limit=50" -H "X-API-Key: $KEY"
-# 获取邮件
-curl "$BASE/messages/MESSAGE_ID" -H "X-API-Key: $KEY"
-# 标记已读
-curl -X PATCH "$BASE/messages/MESSAGE_ID" -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d '{"seen":true}'
-# 删除邮件或邮箱
-curl -X DELETE "$BASE/messages/MESSAGE_ID" -H "X-API-Key: $KEY"
-curl -X DELETE "$BASE/inboxes/INBOX_ID" -H "X-API-Key: $KEY"
-\`\`\`
-
-不支持发件、匿名邮箱、Webhook、通配域、持久邮箱访问、原始邮件源码或速率限制配置。` : `# Cloud Mail Temporary Inbox API Guide
+API 密钥调用必须附带 address 以限制在该密钥创建的邮箱。Webhooks、持久邮箱、发件、DNS 自动配置及其他非临时邮箱服务不属于此 API。` : `# Cloud Mail Temporary Inbox API Guide
 
 Base URL: ${origin}/v1
 
-This API creates and manages API-only temporary inboxes. An inbox, its messages, and attachments are deleted 24 hours after creation. Before use, an administrator must enable Temporary Inbox API, configure allowed domains, and grant your role the API Keys permission. A key is shown only once at creation; store it securely.
+Create temporary accounts with an AC- API key. Successful creation returns a Bearer token bound to that inbox; it can read, update, delete, refresh, and download attachments for that same inbox. Administrators configure API domains and may mark roots whose wildcard Email Routing MX already exists.
 
 ## Authentication
-Send this header on every request:\nX-API-Key: cm_your_api_key
-Replace only cm_your_api_key with the key copied when it was created. Do not use a browser login token.
-
-## Scopes
-- inboxes:read: ${labels['inboxes:read']} — list and view inboxes created by this key.
-- inboxes:write: ${labels['inboxes:write']} — create and delete inboxes created by this key.
-- messages:read: ${labels['messages:read']} — list/view messages and download attachments.
-- messages:write: ${labels['messages:write']} — update seen state and delete messages.
+API-key operations:\nX-API-Key: AC_your_api_key
+Temporary-token operations:\nAuthorization: Bearer TEMP_TOKEN
 
 ## Endpoints
-- POST /inboxes (inboxes:write): create an inbox. JSON: {"domain":"allowed domain","localPart":"optional lowercase prefix"}. domain must be allowed by the administrator; omit localPart for a server-generated value.
-- GET /inboxes (inboxes:read): list active inboxes created by this key.
-- GET /inboxes/{id} (inboxes:read): get inbox and message count.
-- DELETE /inboxes/{id} (inboxes:write): delete inbox, messages, and attachments.
-- GET /inboxes/{id}/messages?limit=50&seen=true&after_id=123 (messages:read): list messages. limit is 1-100; seen is true/false; after_id is the next-page cursor.
-- GET /messages/{id} (messages:read): get message body and attachment URLs.
-- PATCH /messages/{id} (messages:write): JSON must be {"seen":true}.
-- DELETE /messages/{id} (messages:write): delete a message and attachments.
-- GET /messages/{id}/attachments/{attachmentId} (messages:read): download an attachment.
+- POST /accounts creates a fixed account; accepts localPart, address, and domain.
+- POST /accounts/wildcard creates a wildcard account; accepts domain, subdomain, and localPart.
+- POST /inboxes is the deprecated creation alias.
+- GET /accounts/me and POST /token require the temporary token.
+- GET /inboxes/{id}; GET/DELETE /accounts/{id} (the latter is a compatible alias).
+- GET /messages?address=... or GET /inboxes/{id}/messages supports limit, offset, seen, since, q, and after_id.
+- GET /messages/next?address=...; POST /messages/mark-read?address=....
+- GET/PATCH/DELETE /messages/{id}?address=...; PATCH supports seen and starred.
+- GET /sources/{id}?address=... returns the original RFC 822 source; attachment URLs use /messages/{id}/attachments/{attachmentId}.
 
-## Responses and ownership
-Success: {"success":true,"data":...}. Error: {"success":false,"error":"...","errorCode":"..."}. 401 means invalid or revoked key; 403 means API disabled or missing scope; 404 means missing, expired, deleted, or another key's resource; 409 means address conflict. A key can access only inboxes it created, including when another key belongs to the same user.
-
-## curl examples
-\`\`\`bash
-KEY='cm_your_api_key'
-BASE='${origin}/v1'
-# Create an inbox
-curl -X POST "$BASE/inboxes" -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d '{"domain":"example.com","localPart":"demo"}'
-# List messages
-curl "$BASE/inboxes/INBOX_ID/messages?limit=50" -H "X-API-Key: $KEY"
-# Get a message
-curl "$BASE/messages/MESSAGE_ID" -H "X-API-Key: $KEY"
-# Mark seen
-curl -X PATCH "$BASE/messages/MESSAGE_ID" -H "X-API-Key: $KEY" -H 'Content-Type: application/json' -d '{"seen":true}'
-# Delete a message or inbox
-curl -X DELETE "$BASE/messages/MESSAGE_ID" -H "X-API-Key: $KEY"
-curl -X DELETE "$BASE/inboxes/INBOX_ID" -H "X-API-Key: $KEY"
-\`\`\`
-
-This API does not support sending mail, anonymous inboxes, webhooks, wildcard domains, persistent mailbox access, raw email source, or rate-limit configuration.`;
+API-key message calls must include address and are restricted to accounts created with that key. Webhooks, persistent mailboxes, sending, DNS provisioning, and other non-temporary services are excluded.`;
 }
 
 async function load() {
@@ -245,9 +194,9 @@ async function copyGuide() {
   await copyText(guide.value);
 }
 
-function revoke(row) {
-  ElMessageBox.confirm(t('delConfirm', { msg: row.name }), { type: 'warning' }).then(async () => {
-    await apiKeyRevoke(row.apiKeyId);
+function deleteKey(row) {
+  ElMessageBox.confirm(t('deleteApiKeyWarning', { msg: row.name }), { type: 'warning' }).then(async () => {
+    await apiKeyDelete(row.apiKeyId);
     await load();
   });
 }

@@ -31,6 +31,7 @@ const dbInit = {
 		await this.v3_0DB(c);
 		await this.v3DB(c);
 		await this.v3_1DB(c);
+		await this.v3_2DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -61,7 +62,8 @@ const dbInit = {
 		const statements = [
 			`ALTER TABLE setting ADD COLUMN api_enabled INTEGER NOT NULL DEFAULT 1`,
 			`ALTER TABLE setting ADD COLUMN api_domains TEXT NOT NULL DEFAULT ''`,
-			`CREATE TABLE IF NOT EXISTS api_key (api_key_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL, secret_hash TEXT NOT NULL UNIQUE, secret_prefix TEXT NOT NULL, scopes TEXT NOT NULL, revoked_at TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+			`ALTER TABLE setting ADD COLUMN api_wildcard_domains TEXT NOT NULL DEFAULT ''`,
+			`CREATE TABLE IF NOT EXISTS api_key (api_key_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL, secret_hash TEXT NOT NULL UNIQUE, secret_prefix TEXT NOT NULL, scopes TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 			`CREATE TABLE IF NOT EXISTS temp_inbox (temp_inbox_id TEXT PRIMARY KEY, api_key_id INTEGER NOT NULL, user_id INTEGER NOT NULL, address TEXT NOT NULL UNIQUE COLLATE NOCASE, domain TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, expires_at TEXT NOT NULL, deleted_at TEXT)`,
 			`CREATE TABLE IF NOT EXISTS temp_message (temp_message_id INTEGER PRIMARY KEY AUTOINCREMENT, temp_inbox_id TEXT NOT NULL, send_email TEXT, name TEXT, subject TEXT, text TEXT, content TEXT, recipient TEXT NOT NULL DEFAULT '[]', cc TEXT NOT NULL DEFAULT '[]', message_id TEXT NOT NULL DEFAULT '', unread INTEGER NOT NULL DEFAULT 0, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, is_deleted INTEGER NOT NULL DEFAULT 0)`,
 			`CREATE TABLE IF NOT EXISTS temp_attachment (temp_attachment_id INTEGER PRIMARY KEY AUTOINCREMENT, temp_message_id INTEGER NOT NULL, key TEXT NOT NULL, filename TEXT, mime_type TEXT, size INTEGER, disposition TEXT, content_id TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
@@ -76,7 +78,7 @@ const dbInit = {
 		}
 
 		for (const statement of [
-			`CREATE INDEX IF NOT EXISTS api_key_user_revoked_idx ON api_key(user_id, revoked_at)`,
+			`CREATE INDEX IF NOT EXISTS api_key_user_idx ON api_key(user_id)`,
 			`CREATE INDEX IF NOT EXISTS temp_inbox_key_expiry_idx ON temp_inbox(api_key_id, expires_at)`,
 			`CREATE INDEX IF NOT EXISTS temp_inbox_address_idx ON temp_inbox(address)`,
 			`CREATE INDEX IF NOT EXISTS temp_message_inbox_idx ON temp_message(temp_inbox_id, is_deleted, temp_message_id)`,
@@ -102,6 +104,45 @@ const dbInit = {
 			SELECT 'API 密钥', 'api-key:query', ?, 2, 0
 			WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'api-key:query')
 		`).bind(parent.perm_id).run();
+	},
+
+	async v3_2DB(c) {
+		const statements = [
+			`ALTER TABLE setting ADD COLUMN api_wildcard_domains TEXT NOT NULL DEFAULT ''`,
+			`ALTER TABLE temp_inbox ADD COLUMN mode TEXT NOT NULL DEFAULT 'fixed'`,
+			`ALTER TABLE temp_inbox ADD COLUMN subdomain TEXT NOT NULL DEFAULT ''`,
+			`ALTER TABLE temp_message ADD COLUMN raw_source TEXT NOT NULL DEFAULT ''`,
+			`ALTER TABLE temp_message ADD COLUMN size INTEGER NOT NULL DEFAULT 0`,
+			`ALTER TABLE temp_message ADD COLUMN starred INTEGER NOT NULL DEFAULT 0`,
+			`CREATE TABLE IF NOT EXISTS temp_token (token_hash TEXT PRIMARY KEY, temp_inbox_id TEXT NOT NULL, expires_at TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+			`CREATE TABLE IF NOT EXISTS api_key_usage (api_key_id INTEGER NOT NULL, usage_date TEXT NOT NULL, call_count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(api_key_id, usage_date))`,
+			`CREATE TABLE IF NOT EXISTS temp_api_migration (version TEXT PRIMARY KEY)`
+		];
+		for (const statement of statements) {
+			try {
+				await c.env.db.prepare(statement).run();
+			} catch (error) {
+				console.warn(`Skipping temporary API migration statement: ${error.message}`);
+			}
+		}
+		for (const statement of [
+			`CREATE INDEX IF NOT EXISTS temp_token_inbox_expiry_idx ON temp_token(temp_inbox_id, expires_at)`,
+			`CREATE INDEX IF NOT EXISTS api_key_usage_date_idx ON api_key_usage(usage_date)`
+		]) await c.env.db.prepare(statement).run();
+		const applied = await c.env.db.prepare(`SELECT version FROM temp_api_migration WHERE version = 'v3_2'`).first();
+		if (applied) return;
+		const attachments = await c.env.db.prepare(`SELECT key FROM temp_attachment`).all();
+		await c.env.db.batch([
+			c.env.db.prepare(`DELETE FROM temp_token`),
+			c.env.db.prepare(`DELETE FROM temp_attachment`),
+			c.env.db.prepare(`DELETE FROM temp_message`),
+			c.env.db.prepare(`DELETE FROM temp_inbox`),
+			c.env.db.prepare(`DELETE FROM api_key`),
+			c.env.db.prepare(`DELETE FROM api_key_usage`)
+		]);
+		const { default: tempInboxService } = await import('../service/temp-inbox-service');
+		for (const attachment of attachments.results) await tempInboxService.deleteObjectIfUnreferenced(c, attachment.key);
+		await c.env.db.prepare(`INSERT INTO temp_api_migration(version) VALUES ('v3_2')`).run();
 	},
 
 	async v2_9DB(c) {

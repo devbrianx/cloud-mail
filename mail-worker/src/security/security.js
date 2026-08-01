@@ -66,6 +66,7 @@ const requirePerms = [
 ];
 
 const premKey = {
+
 	'email:delete': ['/email/delete'],
 	'email:send': ['/email/send'],
 	'account:add': ['/account/add'],
@@ -98,12 +99,15 @@ app.use('*', async (c, next) => {
 
 	const path = c.req.path;
 	if (path.startsWith('/v1/')) {
-		if (path === '/v1/openapi.json' || path === '/v1/llms.txt') return await next();
+		if (['/v1/openapi.json', '/v1/openapi.yaml', '/v1/llms.txt', '/v1/error-codes'].includes(path)) return await next();
 		const setting = await settingService.query(c);
 		if (setting.apiEnabled !== 0) return apiResponse.fail(c, 403, 'api_disabled', 'API is disabled');
 		const apiPrincipal = await apiKeyService.authenticate(c, c.req.header('X-API-Key'));
-		if (!apiPrincipal) return apiResponse.fail(c, 401, 'api_key_invalid', 'API key is invalid');
-		c.set('apiPrincipal', apiPrincipal);
+		const { default: tempTokenService } = await import('../service/temp-token-service');
+		const attachmentToken = /^\/v1\/messages\/[^/]+\/attachments\/[^/]+$/.test(path) ? new URL(c.req.url).searchParams.get('token') : null;
+		const tokenPrincipal = apiPrincipal ? null : await tempTokenService.authenticate(c, c.req.header('Authorization') || (attachmentToken ? `Bearer ${attachmentToken}` : ''));
+		if (!apiPrincipal && !tokenPrincipal) return apiResponse.fail(c, 401, 'token_invalid_or_expired', 'Invalid or expired token');
+		c.set('apiPrincipal', apiPrincipal || tokenPrincipal);
 		return await next();
 	}
 

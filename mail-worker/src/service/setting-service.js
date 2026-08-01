@@ -16,6 +16,7 @@ const settingService = {
 		const settingRow = await orm(c).select().from(setting).get();
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
 		settingRow.apiDomains = Array.isArray(settingRow.apiDomains) ? settingRow.apiDomains : (settingRow.apiDomains || '').split(',').filter(Boolean);
+		settingRow.apiWildcardDomains = Array.isArray(settingRow.apiWildcardDomains) ? settingRow.apiWildcardDomains : (settingRow.apiWildcardDomains || '').split(',').filter(Boolean);
 		c.set('setting', settingRow);
 		await c.env.kv.put(KvConst.SETTING, JSON.stringify(settingRow));
 	},
@@ -49,6 +50,7 @@ const settingService = {
 		const normalizedDomains = domainList.map(item => item.toLowerCase());
 		setting.domainList = normalizedDomains.map(item => '@' + item);
 		setting.apiDomains = Array.isArray(setting.apiDomains) ? setting.apiDomains : (setting.apiDomains || '').split(',').filter(Boolean);
+		setting.apiWildcardDomains = Array.isArray(setting.apiWildcardDomains) ? setting.apiWildcardDomains : (setting.apiWildcardDomains || '').split(',').filter(Boolean);
 
 
 		let linuxdoSwitch = c.env.linuxdo_switch;
@@ -147,6 +149,13 @@ const settingService = {
 			const apiDomains = [...new Set(params.apiDomains.map(domain => String(domain).trim().toLowerCase()).filter(Boolean))];
 			if (apiDomains.some(domain => !allowedDomains.has(domain))) throw new BizError('API domain is not configured');
 			params.apiDomains = apiDomains.join(',');
+		}
+		if ('apiWildcardDomains' in params) {
+			if (!Array.isArray(params.apiWildcardDomains)) throw new BizError('Wildcard API domains must be an array');
+			const apiDomains = new Set((('apiDomains' in params ? params.apiDomains : settingData.apiDomains) || '').toString().split(',').filter(Boolean));
+			const wildcardDomains = [...new Set(params.apiWildcardDomains.map(domain => String(domain).trim().toLowerCase()).filter(Boolean))];
+			if (wildcardDomains.some(domain => !apiDomains.has(domain))) throw new BizError('Wildcard API domain must be enabled for API creation', 400);
+			params.apiWildcardDomains = wildcardDomains.join(',');
 		}
 
 		params.resendTokens = JSON.stringify(resendTokens);
