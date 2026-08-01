@@ -71,6 +71,24 @@
                   </el-button>
                 </div>
               </div>
+              <div class="setting-item">
+                <div>
+                  <span>{{ $t('apiFeature') }}</span>
+                  <el-tooltip effect="dark" :content="$t('apiFeatureDesc')">
+                    <Icon class="warning" icon="fe:warning" width="18" height="18"/>
+                  </el-tooltip>
+                </div>
+                <div>
+                  <el-switch @change="saveApiSettings" :active-value="0" :inactive-value="1"
+                             v-model="setting.apiEnabled"/>
+                </div>
+              </div>
+              <div class="setting-item">
+                <div><span>{{ $t('apiDomains') }}</span></div>
+                <el-select v-model="apiDomains" multiple collapse-tags collapse-tags-tooltip @change="saveApiSettings">
+                  <el-option v-for="domain in apiDomainOptions" :key="domain" :label="domain" :value="domain"/>
+                </el-select>
+              </div>
             </div>
           </div>
 
@@ -746,6 +764,22 @@
           </div>
         </form>
       </el-dialog>
+      <el-dialog v-model="apiDomainsShow" :title="$t('apiDomains')" width="500" @closed="resetApiDomainsDraft">
+        <p class="api-domains-help">{{ $t('apiDomainsDesc') }}</p>
+        <el-table :data="apiDomainOptions" :empty-text="$t('apiDomainsEmpty')">
+          <el-table-column prop="domain" :label="$t('domain')"/>
+          <el-table-column :label="$t('apiDomainStatus')" width="150">
+            <template #default="{ row }">
+              <el-switch :model-value="apiDomainsDraft.includes(row)" :active-text="$t('enable')"
+                         :inactive-text="$t('disable')" @change="setApiDomain(row, $event)"/>
+            </template>
+          </el-table-column>
+        </el-table>
+        <template #footer>
+          <el-button @click="apiDomainsShow = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" :loading="settingLoading" @click="saveApiDomains">{{ $t('save') }}</el-button>
+        </template>
+      </el-dialog>
       <el-dialog v-model="emailPrefixShow" :title="t('emailPrefix')"  @closed="resetEmailPrefix"  >
         <div class="email-prefix">
           <div>{{ t('atLeast') }}</div>
@@ -935,6 +969,10 @@ const tgMsgFromOption = [{label: t('show'), value: 'show'}, {label: t('hide'), v
 const tgMsgToOption = [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}]
 const tgMsgTextOption = [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}]
 const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px');
+const apiDomains = ref([])
+const apiDomainsShow = ref(false)
+const apiDomainsDraft = ref([])
+const apiDomainOptions = computed(() => settingStore.domainList.map(domain => domain.slice(1)))
 
 getSettings()
 getUpdate()
@@ -961,6 +999,7 @@ function getSettings() {
     nextTick(() => {
       settingReady.value = true
     })
+    apiDomains.value = settingData.apiDomains || []
   })
 }
 
@@ -1450,6 +1489,36 @@ function changeField(key, value) {
   if (!settingReady.value) return
   setting.value[key] = value
   editSetting({[key]: value}, false)
+}
+
+function saveApiSettings() {
+  editSetting({apiEnabled: setting.value.apiEnabled, apiDomains: apiDomains.value})
+}
+
+function openApiDomains() {
+  apiDomainsDraft.value = [...apiDomains.value]
+  apiDomainsShow.value = true
+}
+
+function resetApiDomainsDraft() {
+  apiDomainsDraft.value = []
+}
+
+function setApiDomain(domain, enabled) {
+  if (enabled && !apiDomainsDraft.value.includes(domain)) apiDomainsDraft.value.push(domain)
+  if (!enabled) apiDomainsDraft.value = apiDomainsDraft.value.filter(item => item !== domain)
+}
+
+function saveApiDomains() {
+  if (settingLoading.value) return
+  settingLoading.value = true
+  settingSet({apiEnabled: setting.value.apiEnabled, apiDomains: apiDomainsDraft.value}).then(() => {
+    apiDomains.value = [...apiDomainsDraft.value]
+    apiDomainsShow.value = false
+    ElMessage({message: t('saveSuccessMsg'), type: 'success', plain: true})
+  }).finally(() => {
+    settingLoading.value = false
+  })
 }
 
 function saveTitle() {

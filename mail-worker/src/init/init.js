@@ -29,6 +29,7 @@ const dbInit = {
 		await this.v2_8DB(c);
 		await this.v2_9DB(c);
 		await this.v3_0DB(c);
+		await this.v3DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -53,7 +54,35 @@ const dbInit = {
 		} catch (e) {
 			console.warn(`跳过字段：${e.message}`);
 		}
+	},
 
+	async v3DB(c) {
+		const statements = [
+			`ALTER TABLE setting ADD COLUMN api_enabled INTEGER NOT NULL DEFAULT 1`,
+			`ALTER TABLE setting ADD COLUMN api_domains TEXT NOT NULL DEFAULT ''`,
+			`CREATE TABLE IF NOT EXISTS api_key (api_key_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL, secret_hash TEXT NOT NULL UNIQUE, secret_prefix TEXT NOT NULL, scopes TEXT NOT NULL, revoked_at TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+			`CREATE TABLE IF NOT EXISTS temp_inbox (temp_inbox_id TEXT PRIMARY KEY, api_key_id INTEGER NOT NULL, user_id INTEGER NOT NULL, address TEXT NOT NULL UNIQUE COLLATE NOCASE, domain TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, expires_at TEXT NOT NULL, deleted_at TEXT)`,
+			`CREATE TABLE IF NOT EXISTS temp_message (temp_message_id INTEGER PRIMARY KEY AUTOINCREMENT, temp_inbox_id TEXT NOT NULL, send_email TEXT, name TEXT, subject TEXT, text TEXT, content TEXT, recipient TEXT NOT NULL DEFAULT '[]', cc TEXT NOT NULL DEFAULT '[]', message_id TEXT NOT NULL DEFAULT '', unread INTEGER NOT NULL DEFAULT 0, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, is_deleted INTEGER NOT NULL DEFAULT 0)`,
+			`CREATE TABLE IF NOT EXISTS temp_attachment (temp_attachment_id INTEGER PRIMARY KEY AUTOINCREMENT, temp_message_id INTEGER NOT NULL, key TEXT NOT NULL, filename TEXT, mime_type TEXT, size INTEGER, disposition TEXT, content_id TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
+		];
+
+		for (const statement of statements) {
+			try {
+				await c.env.db.prepare(statement).run();
+			} catch (error) {
+				console.warn(`Skipping API migration: ${error.message}`);
+			}
+		}
+
+		for (const statement of [
+			`CREATE INDEX IF NOT EXISTS api_key_user_revoked_idx ON api_key(user_id, revoked_at)`,
+			`CREATE INDEX IF NOT EXISTS temp_inbox_key_expiry_idx ON temp_inbox(api_key_id, expires_at)`,
+			`CREATE INDEX IF NOT EXISTS temp_inbox_address_idx ON temp_inbox(address)`,
+			`CREATE INDEX IF NOT EXISTS temp_message_inbox_idx ON temp_message(temp_inbox_id, is_deleted, temp_message_id)`,
+			`CREATE INDEX IF NOT EXISTS temp_attachment_message_idx ON temp_attachment(temp_message_id)`
+		]) {
+			await c.env.db.prepare(statement).run();
+		}
 	},
 
 	async v2_9DB(c) {

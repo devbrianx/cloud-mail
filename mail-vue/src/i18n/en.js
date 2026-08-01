@@ -337,6 +337,16 @@ const en = {
     searchEmail: 'Search by Email',
     searchSender: 'Search by Sender',
     userEmail: 'Email Address'
+    ,apiKeys: 'API Keys'
+    ,apiFeature: 'Temporary Inbox API'
+    ,apiFeatureDesc: 'When enabled, users can create API keys for temporary inboxes that expire after 24 hours.'
+    ,apiDomains: 'API Domains'
+    ,apiKeyName: 'Key Name'
+    ,apiScopes: 'Scopes'
+    ,createApiKey: 'Create API Key'
+    ,revokeApiKey: 'Revoke API Key'
+    ,apiKeySecretWarning: 'Copy this secret now. It cannot be shown again after closing.'
+    ,apiKeyRevoked: 'Revoked'
 }
 
 export default en

@@ -29,6 +29,25 @@ const s3Service = {
 		await client.send(new PutObjectCommand(obj))
 	},
 
+	async getObj(c, key) {
+		const client = await this.client(c);
+		const { bucket } = await settingService.query(c);
+		try {
+			const object = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+			if (!object.Body) return null;
+			return {
+				body: object.Body,
+				httpMetadata: {
+					contentType: object.ContentType,
+					contentDisposition: object.ContentDisposition
+				}
+			};
+		} catch (error) {
+			if (error?.$metadata?.httpStatusCode === 404 || error?.name === 'NoSuchKey') return null;
+			throw error;
+		}
+	},
+
 	async deleteObj(c, keys) {
 
 		if (typeof keys === 'string') {

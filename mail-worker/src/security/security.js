@@ -7,6 +7,9 @@ import userService from '../service/user-service';
 import permService from '../service/perm-service';
 import { t } from '../i18n/i18n'
 import app from '../hono/hono';
+import settingService from '../service/setting-service';
+import apiKeyService from '../service/api-key-service';
+import apiResponse from '../model/api-response';
 
 const exclude = [
 	'/login',
@@ -92,6 +95,15 @@ const premKey = {
 app.use('*', async (c, next) => {
 
 	const path = c.req.path;
+	if (path.startsWith('/v1/')) {
+		if (path === '/v1/openapi.json' || path === '/v1/llms.txt') return await next();
+		const setting = await settingService.query(c);
+		if (setting.apiEnabled !== 0) return apiResponse.fail(c, 403, 'api_disabled', 'API is disabled');
+		const apiPrincipal = await apiKeyService.authenticate(c, c.req.header('X-API-Key'));
+		if (!apiPrincipal) return apiResponse.fail(c, 401, 'api_key_invalid', 'API key is invalid');
+		c.set('apiPrincipal', apiPrincipal);
+		return await next();
+	}
 
 	const index = exclude.findIndex(item => {
 		return path.startsWith(item);

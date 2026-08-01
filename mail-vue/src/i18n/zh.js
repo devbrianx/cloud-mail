@@ -337,5 +337,15 @@ const zh = {
     searchEmail: '搜索邮箱',
     searchSender: '搜索发件人',
     userEmail: '用户邮箱'
+    ,apiKeys: 'API 密钥'
+    ,apiFeature: '临时邮箱 API'
+    ,apiFeatureDesc: '启用后用户可创建 API 密钥并调用 24 小时有效的临时邮箱 API'
+    ,apiDomains: 'API 可用域名'
+    ,apiKeyName: '密钥名称'
+    ,apiScopes: '权限范围'
+    ,createApiKey: '创建 API 密钥'
+    ,revokeApiKey: '撤销 API 密钥'
+    ,apiKeySecretWarning: '请立即复制该密钥，关闭后无法再次查看。'
+    ,apiKeyRevoked: '已撤销'
 }
 export default zh

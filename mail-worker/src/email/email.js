@@ -11,6 +11,10 @@ import roleService from '../service/role-service';
 import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
 import aiService from '../service/ai-service';
+import tempInbox from '../entity/temp-inbox';
+import tempMessageService from '../service/temp-message-service';
+import orm from '../entity/orm';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 
 export async function email(message, env, ctx) {
 
@@ -49,6 +53,16 @@ export async function email(message, env, ctx) {
 
 		const email = await PostalMime.parse(content);
 
+
+		const tempInboxRow = await orm({ env }).select().from(tempInbox).where(and(
+			eq(tempInbox.address, message.to),
+			isNull(tempInbox.deletedAt),
+			gt(tempInbox.expiresAt, new Date().toISOString())
+		)).get();
+		if (tempInboxRow) {
+			await tempMessageService.receiveInbound({ env }, tempInboxRow, email, content);
+			return;
+		}
 
 		const blockFlag = checkBlock(blackSubject, blackContent, blackFrom, email);
 

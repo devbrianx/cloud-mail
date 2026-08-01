@@ -31,6 +31,11 @@
           <Icon icon="fluent:settings-48-regular" width="20" height="20" />
           <span class="menu-name" style="margin-left: 21px">{{$t('settings')}}</span>
         </el-menu-item>
+        <el-menu-item v-if="settingStore.settings.apiEnabled === 0" @click="router.push({name: 'api-key'})" index="api-key"
+                      :class="route.meta.name === 'api-key' ? 'choose-item' : ''">
+          <Icon icon="solar:key-outline" width="20" height="20" />
+          <span class="menu-name" style="margin-left: 21px">{{$t('apiKeys')}}</span>
+        </el-menu-item>
         <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
           <div>{{$t('manage')}}</div>
         </div>

@@ -31,9 +31,10 @@ directory = "./dist"	#前端vue项目打包的静态资源存放位置,默认dis
 not_found_handling = "single-page-application"
 run_worker_first = true
 
-[triggers]
-crons = ["0 16 * * *"]	#每天晚上12点执行每日任务,刷新分析缓存
-
+crons = ["0 * * * *", "*/30 * * * *", "0 16 * * *"]
+[mail-worker/wrangler-action.toml#1E4C]
+crons = ["0 * * * *", "0 16 * * *"]
+crons = ["0 * * * *", "*/30 * * * *", "0 16 * * *"]
 
 [vars]
 #ai_model = ""			#ai模型,不填默认使用@cf/meta/llama-3.1-8b-instruct

@@ -15,6 +15,7 @@ const settingService = {
 	async refresh(c) {
 		const settingRow = await orm(c).select().from(setting).get();
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
+		settingRow.apiDomains = Array.isArray(settingRow.apiDomains) ? settingRow.apiDomains : (settingRow.apiDomains || '').split(',').filter(Boolean);
 		c.set('setting', settingRow);
 		await c.env.kv.put(KvConst.SETTING, JSON.stringify(settingRow));
 	},
@@ -41,12 +42,13 @@ const settingService = {
 			}
 		}
 
-		if (!c.env.domain) {
+		if (!Array.isArray(domainList)) {
 			throw new BizError(t('noDomainVariable'));
 		}
 
-		domainList = domainList.map(item => '@' + item);
-		setting.domainList = domainList;
+		const normalizedDomains = domainList.map(item => item.toLowerCase());
+		setting.domainList = normalizedDomains.map(item => '@' + item);
+		setting.apiDomains = Array.isArray(setting.apiDomains) ? setting.apiDomains : (setting.apiDomains || '').split(',').filter(Boolean);
 
 
 		let linuxdoSwitch = c.env.linuxdo_switch;
@@ -137,6 +139,14 @@ const settingService = {
 
 		if (Array.isArray(params.aiCodeFilter)) {
 			params.aiCodeFilter = params.aiCodeFilter + '';
+		}
+
+		if ('apiDomains' in params) {
+			if (!Array.isArray(params.apiDomains)) throw new BizError('API domains must be an array');
+			const allowedDomains = new Set(settingData.domainList.map(domain => domain.slice(1)));
+			const apiDomains = [...new Set(params.apiDomains.map(domain => String(domain).trim().toLowerCase()).filter(Boolean))];
+			if (apiDomains.some(domain => !allowedDomains.has(domain))) throw new BizError('API domain is not configured');
+			params.apiDomains = apiDomains.join(',');
 		}
 
 		params.resendTokens = JSON.stringify(resendTokens);
@@ -232,7 +242,8 @@ const settingService = {
 			linuxdoCallbackUrl: settingRow.linuxdoCallbackUrl,
 			linuxdoSwitch: settingRow.linuxdoSwitch,
 			minEmailPrefix: settingRow.minEmailPrefix,
-			projectLink: settingRow.projectLink
+			projectLink: settingRow.projectLink,
+			apiEnabled: settingRow.apiEnabled
 		};
 	},
 
