@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 import worker from '../src';
 import { email } from '../src/email/email';
 import apiKeyService from '../src/service/api-key-service';
+import jwtUtils from '../src/utils/jwt-utils';
+import KvConst from '../src/const/kv-const';
+import permService from '../src/service/perm-service';
+import { dbInit } from '../src/init/init';
 
 const encoder = new TextEncoder();
 
@@ -32,6 +36,13 @@ function apiOptions(secret, method = 'GET', body) {
 	};
 }
 
+async function browserOptions(userId, email) {
+	const token = `browser-${userId}`;
+	await env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify({ user: { userId, email }, tokens: [token], refreshTime: new Date().toISOString() }));
+	const jwt = await jwtUtils.generateToken({ env }, { userId, token });
+	return { headers: { Authorization: jwt } };
+}
+
 describe('temporary inbox API', () => {
 	it('publishes the contract while disabled and rejects operational calls', async () => {
 		const docs = await request('/v1/openapi.json');
@@ -48,6 +59,26 @@ describe('temporary inbox API', () => {
 		const response = await request('/api/setting/websiteConfig');
 		expect(response.status).toBe(200);
 		expect((await response.json()).data.domainList).toEqual(['@example.com', '@alt.example.com']);
+	});
+
+	it('requires the API key role permission for browser key management', async () => {
+		const regular = await request('/api/apiKey/list', await browserOptions(1, 'user@example.com'));
+		expect(regular.status).toBe(200);
+		expect((await regular.json()).code).toBe(403);
+		await env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) VALUES ('临时邮箱 API', NULL, 0, 1, 5.2), ('API 密钥', 'api-key:query', 1, 2, 0)`).run();
+		await env.db.prepare(`INSERT INTO role_perm (role_id, perm_id) VALUES (1, 2)`).run();
+		const permitted = await request('/api/apiKey/list', await browserOptions(1, 'user@example.com'));
+		expect(permitted.status).toBe(200);
+		const admin = await request('/api/apiKey/list', await browserOptions(2, 'admin@example.com'));
+		expect(admin.status).toBe(200);
+	});
+
+	it('seeds the API key permission tree idempotently', async () => {
+		await dbInit.v3_1DB({ env });
+		await dbInit.v3_1DB({ env });
+		const tree = await permService.tree({ env });
+		const apiParent = tree.find(item => item.name === '临时邮箱 API');
+		expect(apiParent.children.map(item => item.permKey)).toEqual(['api-key:query']);
 	});
 	it('creates only valid keys and never stores their plaintext secret', async () => {
 		const context = { env, get() { return undefined; }, set() {} };

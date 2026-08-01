@@ -347,5 +347,15 @@ const zh = {
     ,revokeApiKey: '撤销 API 密钥'
     ,apiKeySecretWarning: '请立即复制该密钥，关闭后无法再次查看。'
     ,apiKeyRevoked: '已撤销'
+    ,apiScopeInboxesRead: '邮箱读取'
+    ,apiScopeInboxesWrite: '邮箱管理'
+    ,apiScopeMessagesRead: '邮件读取'
+    ,apiScopeMessagesWrite: '邮件管理'
+    ,apiUsageGuide: '使用说明'
+    ,apiUsageGuideCopy: '复制说明'
+    ,apiDomainsDesc: '开启需要允许 API 创建临时邮箱的域名。'
+    ,apiDomainsEmpty: '没有可配置的域名'
+    ,apiDomainConfigure: '配置'
+    ,apiDomainStatus: '状态'
 }
 export default zh

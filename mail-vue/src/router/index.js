@@ -51,16 +51,6 @@ const routes = [
                     menu: true
                 }
             },
-            {
-                path: '/api-keys',
-                name: 'api-key',
-                component: () => import('@/views/api-key/index.vue'),
-                meta: {
-                    title: 'apiKeys',
-                    name: 'api-key',
-                    menu: true
-                }
-            },
         ]
 
     },

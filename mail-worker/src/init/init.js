@@ -30,6 +30,7 @@ const dbInit = {
 		await this.v2_9DB(c);
 		await this.v3_0DB(c);
 		await this.v3DB(c);
+		await this.v3_1DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -83,6 +84,24 @@ const dbInit = {
 		]) {
 			await c.env.db.prepare(statement).run();
 		}
+	},
+
+	async v3_1DB(c) {
+		await c.env.db.prepare(`
+			INSERT INTO perm (name, perm_key, pid, type, sort)
+			SELECT '临时邮箱 API', NULL, 0, 1, 5.2
+			WHERE NOT EXISTS (
+				SELECT 1 FROM perm WHERE name = '临时邮箱 API' AND perm_key IS NULL AND pid = 0
+			)
+		`).run();
+		const parent = await c.env.db.prepare(`
+			SELECT perm_id FROM perm WHERE name = '临时邮箱 API' AND perm_key IS NULL AND pid = 0
+		`).first();
+		await c.env.db.prepare(`
+			INSERT INTO perm (name, perm_key, pid, type, sort)
+			SELECT 'API 密钥', 'api-key:query', ?, 2, 0
+			WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = 'api-key:query')
+		`).bind(parent.perm_id).run();
 	},
 
 	async v2_9DB(c) {

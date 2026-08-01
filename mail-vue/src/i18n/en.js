@@ -347,6 +347,16 @@ const en = {
     ,revokeApiKey: 'Revoke API Key'
     ,apiKeySecretWarning: 'Copy this secret now. It cannot be shown again after closing.'
     ,apiKeyRevoked: 'Revoked'
+    ,apiScopeInboxesRead: 'Read inboxes'
+    ,apiScopeInboxesWrite: 'Manage inboxes'
+    ,apiScopeMessagesRead: 'Read messages'
+    ,apiScopeMessagesWrite: 'Manage messages'
+    ,apiUsageGuide: 'Usage Guide'
+    ,apiUsageGuideCopy: 'Copy Guide'
+    ,apiDomainsDesc: 'Enable the domains that the API may use to create temporary inboxes.'
+    ,apiDomainsEmpty: 'No configurable domains'
+    ,apiDomainConfigure: 'Configure'
+    ,apiDomainStatus: 'Status'
 }
 
 export default en
