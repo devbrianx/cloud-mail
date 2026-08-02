@@ -62,7 +62,8 @@ const requirePerms = [
 	'/regKey/delete',
 	'/regKey/clearNotUse',
 	'/regKey/history',
-	'/apiKey'
+	'/apiKey',
+	'/tempInbox'
 ];
 
 const premKey = {
@@ -92,7 +93,7 @@ const premKey = {
 	'reg-key:add': ['/regKey/add'],
 	'reg-key:query': ['/regKey/list','/regKey/history'],
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
-	'api-key:query': ['/apiKey'],
+	'api-key:query': ['/apiKey', '/tempInbox']
 };
 
 app.use('*', async (c, next) => {

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, isNull, lte, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import orm from '../entity/orm';
 import tempInbox from '../entity/temp-inbox';
@@ -11,6 +11,7 @@ import apiUsageService from './api-usage-service';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LOCAL_PART = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 const SUBDOMAIN = /^[a-z0-9][a-z0-9-]{0,61}$/;
+const INBOX_ID = /^[a-f0-9]{32}$/;
 
 function createInboxId() {
 	const bytes = new Uint8Array(16);
@@ -87,6 +88,33 @@ const tempInboxService = {
 	async detail(c, row) {
 		const { total } = await orm(c).select({ total: count() }).from(tempMessage).where(and(eq(tempMessage.tempInboxId, row.tempInboxId), eq(tempMessage.isDeleted, 0))).get();
 		return { ...this.toApiInbox(row), messageCount: total };
+	},
+
+	async listActiveByUser(c, userId, { limit: requestedLimit, offset: requestedOffset } = {}) {
+		const limit = requestedLimit == null ? 50 : Number(requestedLimit);
+		const offset = requestedOffset == null ? 0 : Number(requestedOffset);
+		if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0 || offset > 10000) throw new BizError('Temporary inbox list is invalid', 400);
+		const conditions = and(eq(tempInbox.userId, userId), isNull(tempInbox.deletedAt), gt(tempInbox.expiresAt, new Date().toISOString()));
+		const [rows, { total }] = await Promise.all([
+			orm(c).select().from(tempInbox).where(conditions).orderBy(desc(tempInbox.createTime)).limit(limit).offset(offset).all(),
+			orm(c).select({ total: count() }).from(tempInbox).where(conditions).get()
+		]);
+		const list = await Promise.all(rows.map(async row => ({ ...this.toApiInbox(row), messageCount: (await orm(c).select({ total: count() }).from(tempMessage).where(and(eq(tempMessage.tempInboxId, row.tempInboxId), eq(tempMessage.isDeleted, 0))).get()).total })));
+		return { list, total };
+	},
+
+	async requireActiveOwnedByUser(c, userId, inboxId) {
+		const row = await orm(c).select().from(tempInbox).where(and(eq(tempInbox.tempInboxId, inboxId), eq(tempInbox.userId, userId), isNull(tempInbox.deletedAt), gt(tempInbox.expiresAt, new Date().toISOString()))).get();
+		if (!row) throw new BizError('Inbox not found', 404);
+		return row;
+	},
+
+	async deleteActiveOwnedByUser(c, userId, inboxIds) {
+		if (!Array.isArray(inboxIds) || !inboxIds.length || inboxIds.length > 100 || inboxIds.some(id => typeof id !== 'string' || !INBOX_ID.test(id.trim()))) throw new BizError('Temporary inbox ids are invalid', 400);
+		const ids = [...new Set(inboxIds.map(id => id.trim()))];
+		const rows = await orm(c).select().from(tempInbox).where(and(inArray(tempInbox.tempInboxId, ids), eq(tempInbox.userId, userId), isNull(tempInbox.deletedAt), gt(tempInbox.expiresAt, new Date().toISOString()))).all();
+		for (const row of rows) await this.deleteInbox(c, row);
+		return { deleted: rows.length };
 	},
 
 	async deleteObjectIfUnreferenced(c, key) {

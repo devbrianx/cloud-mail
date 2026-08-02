@@ -363,6 +363,14 @@ const en = {
     ,apiDomainsEmpty: 'No configurable domains'
     ,apiDomainConfigure: 'Configure'
     ,apiDomainStatus: 'Status'
+    ,temporaryInboxes: 'Temporary Inboxes'
+    ,temporaryInbox: 'Temporary Inbox'
+    ,expiresAt: 'Expires At'
+    ,messageCount: 'Messages'
+    ,deleteTemporaryInboxesWarning: 'Deleting the selected temporary inboxes permanently deletes their messages, attachments, and temporary tokens. Continue?'
+    ,temporaryInboxesEmpty: 'No active temporary inboxes'
+    ,selectTemporaryInbox: 'Select a temporary inbox'
+    ,selectTemporaryMessage: 'Select a message'
 }
 
 export default en

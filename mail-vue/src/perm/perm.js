@@ -119,14 +119,18 @@ const routers = {
             menu: true
         }
 	}],
-	'api-key:query': [{
-		path: '/api-keys',
-		name: 'api-key',
-		component: () => import('@/views/api-key/index.vue'),
-		meta: {
-			title: 'apiKeys',
+	'api-key:query': [
+		{
+			path: '/api-keys',
 			name: 'api-key',
-			menu: true
+			component: () => import('@/views/api-key/index.vue'),
+			meta: { title: 'apiKeys', name: 'api-key', menu: true }
+		},
+		{
+			path: '/temporary-inboxes',
+			name: 'temp-inbox',
+			component: () => import('@/views/temp-inbox/index.vue'),
+			meta: { title: 'temporaryInboxes', name: 'temp-inbox', menu: true }
 		}
-	}]
+	]
 }

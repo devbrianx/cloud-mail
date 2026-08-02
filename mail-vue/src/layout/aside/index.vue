@@ -36,6 +36,11 @@
           <Icon icon="solar:key-outline" width="20" height="20" />
           <span class="menu-name" style="margin-left: 21px">{{$t('apiKeys')}}</span>
         </el-menu-item>
+		<el-menu-item v-if="settingStore.settings.apiEnabled === 0" v-perm="'api-key:query'" @click="router.push({name: 'temp-inbox'})" index="temp-inbox"
+		              :class="route.meta.name === 'temp-inbox' ? 'choose-item' : ''">
+		  <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
+		  <span class="menu-name" style="margin-left: 21px">{{$t('temporaryInboxes')}}</span>
+		</el-menu-item>
         <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
           <div>{{$t('manage')}}</div>
         </div>

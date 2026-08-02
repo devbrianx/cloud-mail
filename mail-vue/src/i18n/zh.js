@@ -363,5 +363,13 @@ const zh = {
     ,apiDomainsEmpty: '没有可配置的域名'
     ,apiDomainConfigure: '配置'
     ,apiDomainStatus: '状态'
+    ,temporaryInboxes: '临时邮箱'
+    ,temporaryInbox: '临时邮箱'
+    ,expiresAt: '到期时间'
+    ,messageCount: '邮件数量'
+    ,deleteTemporaryInboxesWarning: '删除选中的临时邮箱会永久删除其邮件、附件和临时令牌，是否继续？'
+    ,temporaryInboxesEmpty: '没有未过期的临时邮箱'
+    ,selectTemporaryInbox: '请选择临时邮箱'
+    ,selectTemporaryMessage: '请选择邮件'
 }
 export default zh
