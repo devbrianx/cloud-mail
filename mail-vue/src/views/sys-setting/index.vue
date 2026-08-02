@@ -106,6 +106,15 @@
                 </div>
               </div>
               <div class="setting-item">
+                <div class="title-item"><span>{{ $t('favicon') }}</span></div>
+                <div class="email-title">
+                  <span>{{ setting.favicon || '/public/mail.png' }}</span>
+                  <el-button class="opt-button" size="small" type="primary" @click="faviconShow = true">
+                    <Icon icon="lsicon:edit-outline" width="16" height="16"/>
+                  </el-button>
+                </div>
+              </div>
+              <div class="setting-item">
                 <div class="title-item"><span>{{ $t('loginBoxOpacity') }}</span></div>
                 <div>
                   <el-input-number size="small" v-model="loginOpacity" @change="opacityChange" :precision="2"
@@ -464,6 +473,12 @@
           <el-button type="primary" :loading="settingLoading" @click="saveTitle">{{ $t('save') }}</el-button>
         </form>
       </el-dialog>
+      <el-dialog v-model="faviconShow" :title="$t('favicon')" width="340" @closed="faviconInput = setting.favicon">
+        <form>
+          <el-input type="text" :placeholder="$t('faviconUrlDesc')" v-model="faviconInput"/>
+          <el-button type="primary" :loading="settingLoading" @click="saveFavicon">{{ $t('save') }}</el-button>
+        </form>
+      </el-dialog>
       <el-dialog v-model="resendTokenFormShow" :title="$t('resendToken')" width="340" @closed="cleanResendTokenForm">
         <form>
           <el-select style="margin-bottom: 15px" v-model="resendTokenForm.domain" placeholder="Select">
@@ -787,22 +802,6 @@
           </div>
         </form>
       </el-dialog>
-      <el-dialog v-model="apiDomainsShow" :title="$t('apiDomains')" width="500" @closed="resetApiDomainsDraft">
-        <p class="api-domains-help">{{ $t('apiDomainsDesc') }}</p>
-        <el-table :data="apiDomainOptions" :empty-text="$t('apiDomainsEmpty')">
-          <el-table-column prop="domain" :label="$t('domain')"/>
-          <el-table-column :label="$t('apiDomainStatus')" width="150">
-            <template #default="{ row }">
-              <el-switch :model-value="apiDomainsDraft.includes(row)" :active-text="$t('enable')"
-                         :inactive-text="$t('disable')" @change="setApiDomain(row, $event)"/>
-            </template>
-          </el-table-column>
-        </el-table>
-        <template #footer>
-          <el-button @click="apiDomainsShow = false">{{ $t('cancel') }}</el-button>
-          <el-button type="primary" :loading="settingLoading" @click="saveApiDomains">{{ $t('save') }}</el-button>
-        </template>
-      </el-dialog>
       <el-dialog v-model="emailPrefixShow" :title="t('emailPrefix')"  @closed="resetEmailPrefix"  >
         <div class="email-prefix">
           <div>{{ t('atLeast') }}</div>
@@ -893,6 +892,7 @@ const localUpShow = ref(false)
 const accountStore = useAccountStore();
 const userStore = useUserStore();
 const editTitleShow = ref(false)
+const faviconShow = ref(false)
 const resendTokenFormShow = ref(false)
 const blackFormShow = ref(false)
 const aiCodeFilterShow = ref(false)
@@ -908,6 +908,8 @@ const settingStore = useSettingStore();
 const uiStore = useUiStore();
 const {settings: setting} = storeToRefs(settingStore);
 const editTitle = ref('')
+const faviconInput = ref('')
+const defaultFavicon = document.getElementById('site-favicon')?.href || '/public/mail.png';
 const settingLoading = ref(false)
 const clearS3Loading = ref(false)
 const r2DomainInput = ref('')
@@ -992,7 +994,6 @@ const tgMsgFromOption = [{label: t('show'), value: 'show'}, {label: t('hide'), v
 const tgMsgToOption = [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}]
 const tgMsgTextOption = [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}]
 const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px');
-	const apiDomains = ref([])
 	const apiDomainsDraft = ref([])
 	const apiWildcardDomainsDraft = ref([])
 	const apiDomainsShow = ref(false)
@@ -1023,8 +1024,7 @@ function getSettings() {
     nextTick(() => {
       settingReady.value = true
     })
-    apiDomains.value = settingData.apiDomains || []
-    apiWildcardDomainsDraft.value = [...(settingData.apiWildcardDomains || [])]
+    faviconInput.value = setting.value.favicon
   })
 }
 
@@ -1459,6 +1459,21 @@ function saveR2domain() {
   editSetting(settingForm)
 }
 
+function saveFavicon() {
+  if (settingLoading.value) return
+  const favicon = faviconInput.value.trim()
+  settingLoading.value = true
+  settingSet({favicon}).then(() => {
+    setting.value.favicon = favicon
+    const icon = document.getElementById('site-favicon') || document.querySelector('link[rel="icon"]')
+    if (icon) icon.href = favicon || defaultFavicon
+    faviconShow.value = false
+    ElMessage({message: t('saveSuccessMsg'), type: 'success', plain: true})
+  }).finally(() => {
+    settingLoading.value = false
+  })
+}
+
 function openResendForm() {
   resendTokenFormShow.value = true
 }
@@ -1510,15 +1525,15 @@ function change(e) {
   editSetting(settingForm, false)
 }
 
-	function saveApiSettings() {
-	  editSetting({apiEnabled: setting.value.apiEnabled, apiDomains: apiDomains.value, apiWildcardDomains: apiWildcardDomainsDraft.value})
-	}
+function saveApiSettings() {
+  editSetting({apiEnabled: setting.value.apiEnabled, apiDomains: setting.value.apiDomains || [], apiWildcardDomains: setting.value.apiWildcardDomains || []})
+}
 
-	function openApiDomains() {
-	  apiDomainsDraft.value = [...apiDomains.value]
-	  apiWildcardDomainsDraft.value = [...(setting.value.apiWildcardDomains || [])]
-	  apiDomainsShow.value = true
-	}
+function openApiDomains() {
+  apiDomainsDraft.value = [...(setting.value.apiDomains || [])]
+  apiWildcardDomainsDraft.value = [...(setting.value.apiWildcardDomains || [])]
+  apiDomainsShow.value = true
+}
 
 	function resetApiDomainsDraft() {
 	  apiDomainsDraft.value = []
@@ -1541,9 +1556,9 @@ function change(e) {
 	function saveApiDomains() {
 	  if (settingLoading.value) return
 	  settingLoading.value = true
-	  settingSet({apiEnabled: setting.value.apiEnabled, apiDomains: apiDomainsDraft.value, apiWildcardDomains: apiWildcardDomainsDraft.value}).then(() => {
-	    apiDomains.value = [...apiDomainsDraft.value]
-	    setting.value.apiWildcardDomains = [...apiWildcardDomainsDraft.value]
+  settingSet({apiEnabled: setting.value.apiEnabled, apiDomains: apiDomainsDraft.value, apiWildcardDomains: apiWildcardDomainsDraft.value}).then(() => {
+    setting.value.apiDomains = [...apiDomainsDraft.value]
+    setting.value.apiWildcardDomains = [...apiWildcardDomainsDraft.value]
 	    apiDomainsShow.value = false
 	    ElMessage({message: t('saveSuccessMsg'), type: 'success', plain: true})
 	  }).finally(() => {
@@ -1577,6 +1592,7 @@ function editSetting(settingForm, refreshStatus = true) {
       getSettings()
     }
     editTitleShow.value = false
+    faviconShow.value = false
     r2DomainShow.value = false
     resendTokenFormShow.value = false
     turnstileShow.value = false

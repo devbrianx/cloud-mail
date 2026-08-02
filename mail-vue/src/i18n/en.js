@@ -141,6 +141,8 @@ const en = {
     multipleEmailDesc: 'Enable this feature to allow users to add multiple email',
     customization: 'Customization',
     websiteTitle: 'Title',
+    favicon: 'Favicon',
+    faviconUrlDesc: 'Favicon URL; leave empty to use the default',
     loginBoxOpacity: 'Login Box Opacity',
     loginBackground: 'Background',
     emailSetting: 'Email',

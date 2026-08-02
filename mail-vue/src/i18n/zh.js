@@ -141,6 +141,8 @@ const zh = {
     multipleEmailDesc: '开启后账号栏出现一个用户可以添加多个邮箱',
     customization: '个性化设置',
     websiteTitle: '网站标题',
+    favicon: '网站图标',
+    faviconUrlDesc: '图标 URL，留空使用默认图标',
     loginBoxOpacity: '登录透明',
     loginBackground: '登录背景',
     emailSetting: '邮件设置',

@@ -32,6 +32,7 @@ const dbInit = {
 		await this.v3DB(c);
 		await this.v3_1DB(c);
 		await this.v3_2DB(c);
+		await this.v3_3DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -143,6 +144,14 @@ const dbInit = {
 		const { default: tempInboxService } = await import('../service/temp-inbox-service');
 		for (const attachment of attachments.results) await tempInboxService.deleteObjectIfUnreferenced(c, attachment.key);
 		await c.env.db.prepare(`INSERT INTO temp_api_migration(version) VALUES ('v3_2')`).run();
+	},
+
+	async v3_3DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN favicon TEXT NOT NULL DEFAULT ''`).run();
+		} catch (error) {
+			console.warn(`Skipping favicon migration statement: ${error.message}`);
+		}
 	},
 
 	async v2_9DB(c) {

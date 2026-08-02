@@ -6,6 +6,16 @@ import {permsToRouter} from "@/perm/perm.js";
 import router from "@/router";
 import {websiteConfig} from "@/request/setting.js";
 import i18n from "@/i18n/index.js";
+const defaultFavicon = document.getElementById('site-favicon')?.href || '/public/mail.png';
+
+
+function applySiteMetadata(setting) {
+    document.title = setting.title;
+    const icon = document.getElementById('site-favicon') || document.querySelector('link[rel="icon"]') || document.head.appendChild(document.createElement('link'));
+    icon.id = 'site-favicon';
+    icon.rel = 'icon';
+    icon.href = setting.favicon || defaultFavicon;
+}
 
 export async function init() {
     document.title = '\u200B'
@@ -35,7 +45,7 @@ export async function init() {
         setting = s;
         settingStore.settings = setting;
         settingStore.domainList = setting.domainList;
-        document.title = setting.title;
+        applySiteMetadata(setting);
 
         if (user) {
             accountStore.currentAccountId = user.account.accountId;
@@ -52,6 +62,6 @@ export async function init() {
         setting = await websiteConfig();
         settingStore.settings = setting;
         settingStore.domainList = setting.domainList;
-        document.title = setting.title;
+        applySiteMetadata(setting);
     }
 }

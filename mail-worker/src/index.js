@@ -7,6 +7,7 @@ import kvObjService from './service/kv-obj-service';
 import oauthService from "./service/oauth-service";
 import analysisService from './service/analysis-service';
 import tempInboxService from './service/temp-inbox-service';
+import KvConst from './const/kv-const';
 export default {
 	 async fetch(req, env, ctx) {
 
@@ -26,7 +27,13 @@ export default {
 			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
 		 }
 
-		return env.assets.fetch(req);
+		const response = await env.assets.fetch(req);
+		if (!response.headers.get('content-type')?.includes('text/html')) return response;
+		const favicon = (await env.kv.get(KvConst.SETTING, { type: 'json' }))?.favicon;
+		if (!favicon) return response;
+		return new HTMLRewriter().on('#site-favicon', {
+			element(element) { element.setAttribute('href', favicon); }
+		}).transform(response);
 	},
 	email: email,
 	async scheduled(c, env, ctx) {

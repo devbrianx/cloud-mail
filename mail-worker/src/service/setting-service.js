@@ -10,6 +10,19 @@ import {t} from '../i18n/i18n'
 import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
 
+
+function normalizeFavicon(value) {
+	const favicon = typeof value === 'string' ? value.trim() : '';
+	if (!favicon) return '';
+	let url;
+	try {
+		url = new URL(favicon);
+	} catch {
+		throw new BizError('Favicon URL is invalid', 400);
+	}
+	if (!['http:', 'https:'].includes(url.protocol)) throw new BizError('Favicon URL is invalid', 400);
+	return url.href;
+}
 const settingService = {
 
 	async refresh(c) {
@@ -143,6 +156,8 @@ const settingService = {
 			params.aiCodeFilter = params.aiCodeFilter + '';
 		}
 
+
+		if ('favicon' in params) params.favicon = normalizeFavicon(params.favicon);
 		if ('apiDomains' in params) {
 			if (!Array.isArray(params.apiDomains)) throw new BizError('API domains must be an array');
 			const allowedDomains = new Set(settingData.domainList.map(domain => domain.slice(1)));
@@ -233,6 +248,7 @@ const settingService = {
 			r2Domain: settingRow.r2Domain,
 			siteKey: settingRow.siteKey,
 			background: settingRow.background,
+			favicon: settingRow.favicon,
 			loginOpacity: settingRow.loginOpacity,
 			domainList: settingRow.loginDomain === 1 && !token ? [] : settingRow.domainList,
 			regKey: settingRow.regKey,
