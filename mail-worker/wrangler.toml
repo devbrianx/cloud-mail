@@ -31,9 +31,8 @@ directory = "./dist"	#前端vue项目打包的静态资源存放位置,默认dis
 not_found_handling = "single-page-application"
 run_worker_first = true
 
-crons = ["0 * * * *", "*/30 * * * *", "0 16 * * *"]
-[mail-worker/wrangler-action.toml#1E4C]
-crons = ["0 * * * *", "0 16 * * *"]
+
+[triggers]
 crons = ["0 * * * *", "*/30 * * * *", "0 16 * * *"]
 
 [vars]
