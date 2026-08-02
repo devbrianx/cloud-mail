@@ -54,7 +54,38 @@
     </el-dialog>
 
     <el-dialog v-model="guideVisible" :title="$t('apiUsageGuide')" width="720">
-      <el-input v-model="guide" type="textarea" :autosize="{ minRows: 18, maxRows: 26 }" readonly />
+      <el-scrollbar class="guide-document" max-height="65vh">
+        <p>{{ $t('apiGuideIntro') }}</p>
+        <p><strong>{{ $t('apiGuideBaseUrl') }}:</strong> <code>{{ apiBase() }}</code></p>
+
+        <h3>{{ $t('apiGuideAuthentication') }}</h3>
+        <dl class="guide-auth">
+          <div><dt>{{ $t('apiGuideApiKeyAuth') }}</dt><dd><code>X-API-Key: AC_your_api_key</code></dd></div>
+          <div><dt>{{ $t('apiGuideTokenAuth') }}</dt><dd><code>Authorization: Bearer TEMP_TOKEN</code></dd></div>
+        </dl>
+
+        <h3>{{ $t('apiGuideScopes') }}</h3>
+        <el-table :data="scopes" size="small" border>
+          <el-table-column prop="value" :label="$t('apiGuideScopes')" min-width="170" />
+          <el-table-column prop="label" :label="$t('apiScopes')" min-width="210" />
+        </el-table>
+
+        <h3>{{ $t('apiGuideCreateAccount') }}</h3>
+        <p>{{ $t('apiGuideCreateAccountDesc') }}</p>
+        <pre><code>{{ createAccountExample() }}</code></pre>
+        <p class="guide-note">{{ $t('apiGuideCreateResponse') }}</p>
+
+        <h3>{{ $t('apiGuideCurrentAccount') }}</h3>
+        <p>{{ $t('apiGuideCurrentAccountDesc') }}</p>
+        <pre><code>{{ currentAccountExample() }}</code></pre>
+
+        <h3>{{ $t('apiGuideListMessages') }}</h3>
+        <p>{{ $t('apiGuideListMessagesDesc') }}</p>
+        <pre><code>{{ listMessagesExample() }}</code></pre>
+
+        <h3>{{ $t('apiGuideRestrictions') }}</h3>
+        <p>{{ $t('apiGuideRestrictionsDesc') }}</p>
+      </el-scrollbar>
       <template #footer>
         <el-button type="primary" @click="copyGuide">{{ $t('apiUsageGuideCopy') }}</el-button>
       </template>
@@ -89,52 +120,117 @@ function scopeLabel(value) {
   return scopes.value.find(scope => scope.value === value)?.label || value;
 }
 
+function apiBase() {
+  return `${window.location.origin}/v1`;
+}
+
+function createAccountExample() {
+  return `curl -X POST '${apiBase()}/accounts' \\
+  -H 'X-API-Key: AC_your_api_key' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"localPart":"demo","domain":"example.com"}'`;
+}
+
+function currentAccountExample() {
+  return `curl '${apiBase()}/accounts/me' \\
+  -H 'Authorization: Bearer TEMP_TOKEN'`;
+}
+
+function listMessagesExample() {
+  return `curl '${apiBase()}/messages?address=demo@example.com&limit=50' \\
+  -H 'X-API-Key: AC_your_api_key'`;
+}
+
 function buildGuide(origin) {
-  const chinese = locale.value === 'zh';
-  const labels = Object.fromEntries(scopes.value.map(scope => [scope.value, scope.label]));
-  return chinese ? `# Cloud Mail 临时邮箱 API 使用说明
+  const base = `${origin}/v1`;
+  const create = createAccountExample().replace(apiBase(), base);
+  const current = currentAccountExample().replace(apiBase(), base);
+  const messages = listMessagesExample().replace(apiBase(), base);
+  return locale.value === 'zh' ? `# Cloud Mail 临时邮箱 API 使用说明
 
-Base URL: ${origin}/v1
+Base URL: ${base}
 
-使用 AC- API 密钥创建临时邮箱。创建成功会返回仅属于该邮箱的临时 Bearer token；临时 token 可用于后续读取同一邮箱、刷新 token、读取邮件、更新状态、删除及下载附件。管理员必须先启用 API、配置 API 域名，并可额外标记已经配置 Cloudflare Email Routing 通配 MX 的通配域。
+使用 AC- API 密钥创建 24 小时有效的临时邮箱。创建成功返回仅绑定该邮箱的临时 Bearer token。
 
 ## 认证
-创建或 API 密钥操作：\nX-API-Key: AC_your_api_key
-临时 token 操作：\nAuthorization: Bearer TEMP_TOKEN
 
-## 接口
-- POST /accounts（inboxes:write）：创建固定临时邮箱，JSON 支持 localPart、address、domain。
-- POST /accounts/wildcard（inboxes:write）：创建通配子域邮箱，JSON 支持 domain、subdomain、localPart。域必须已启用通配能力。
-- POST /inboxes：兼容别名，已弃用；使用 /accounts。
-- GET /accounts/me、POST /token：仅临时 token；刷新时提供 address。
-- GET /inboxes/{id}；GET/DELETE /accounts/{id}（后者为兼容别名）。
-- GET /messages?address=邮箱，或 GET /inboxes/{id}/messages；支持 limit、offset、seen、since、q、after_id。
-- GET /messages/next?address=邮箱；POST /messages/mark-read?address=邮箱。
-- GET/PATCH/DELETE /messages/{id}?address=邮箱；PATCH 支持 seen、starred。
-- GET /sources/{id}?address=邮箱返回原始 RFC 822；附件 URL 为 /messages/{id}/attachments/{attachmentId}。
+- API 密钥操作：\`X-API-Key: AC_your_api_key\`
+- 临时 token 操作：\`Authorization: Bearer TEMP_TOKEN\`
 
-API 密钥调用必须附带 address 以限制在该密钥创建的邮箱。Webhooks、持久邮箱、发件、DNS 自动配置及其他非临时邮箱服务不属于此 API。` : `# Cloud Mail Temporary Inbox API Guide
+## 权限范围
 
-Base URL: ${origin}/v1
+- \`inboxes:read\`：查看临时邮箱。
+- \`inboxes:write\`：创建和删除临时邮箱。
+- \`messages:read\`：读取邮件、附件和原始信件。
+- \`messages:write\`：修改邮件状态或删除邮件。
 
-Create temporary accounts with an AC- API key. Successful creation returns a Bearer token bound to that inbox; it can read, update, delete, refresh, and download attachments for that same inbox. Administrators configure API domains and may mark roots whose wildcard Email Routing MX already exists.
+## 创建临时邮箱
+
+需要 \`inboxes:write\`。成功响应的 \`data\` 包含 \`id\`、\`address\`、\`expiresAt\` 与仅创建时返回的 \`token\`。
+
+\`\`\`bash
+${create}
+\`\`\`
+
+## 查看当前临时邮箱
+
+使用创建时返回的 token。该 token 只能访问绑定的临时邮箱。
+
+\`\`\`bash
+${current}
+\`\`\`
+
+## 查询邮件
+
+需要 \`messages:read\`。使用 API 密钥查询时必须提供 \`address\`，且只能访问该密钥创建的邮箱。
+
+\`\`\`bash
+${messages}
+\`\`\`
+
+Webhooks、持久邮箱、邮件发送和 DNS 自动配置不属于此 API。` : `# Cloud Mail Temporary Inbox API Guide
+
+Base URL: ${base}
+
+Use an AC- API key to create temporary inboxes that expire after 24 hours. Creation returns a temporary Bearer token bound to that inbox.
 
 ## Authentication
-API-key operations:\nX-API-Key: AC_your_api_key
-Temporary-token operations:\nAuthorization: Bearer TEMP_TOKEN
 
-## Endpoints
-- POST /accounts creates a fixed account; accepts localPart, address, and domain.
-- POST /accounts/wildcard creates a wildcard account; accepts domain, subdomain, and localPart.
-- POST /inboxes is the deprecated creation alias.
-- GET /accounts/me and POST /token require the temporary token.
-- GET /inboxes/{id}; GET/DELETE /accounts/{id} (the latter is a compatible alias).
-- GET /messages?address=... or GET /inboxes/{id}/messages supports limit, offset, seen, since, q, and after_id.
-- GET /messages/next?address=...; POST /messages/mark-read?address=....
-- GET/PATCH/DELETE /messages/{id}?address=...; PATCH supports seen and starred.
-- GET /sources/{id}?address=... returns the original RFC 822 source; attachment URLs use /messages/{id}/attachments/{attachmentId}.
+- API-key operations: \`X-API-Key: AC_your_api_key\`
+- Temporary-token operations: \`Authorization: Bearer TEMP_TOKEN\`
 
-API-key message calls must include address and are restricted to accounts created with that key. Webhooks, persistent mailboxes, sending, DNS provisioning, and other non-temporary services are excluded.`;
+## Scopes
+
+- \`inboxes:read\`: Read temporary inboxes.
+- \`inboxes:write\`: Create and delete temporary inboxes.
+- \`messages:read\`: Read messages, attachments, and raw sources.
+- \`messages:write\`: Update message state or delete messages.
+
+## Create a temporary inbox
+
+Requires \`inboxes:write\`. The success \`data\` contains \`id\`, \`address\`, \`expiresAt\`, and the creation-only \`token\`.
+
+\`\`\`bash
+${create}
+\`\`\`
+
+## Read the current temporary inbox
+
+Use the token returned at creation. A temporary token can access only its bound inbox.
+
+\`\`\`bash
+${current}
+\`\`\`
+
+## List messages
+
+Requires \`messages:read\`. API-key message calls must include \`address\` and can access only inboxes created by that key.
+
+\`\`\`bash
+${messages}
+\`\`\`
+
+Webhooks, persistent mailboxes, message sending, and automatic DNS provisioning are outside this API.`;
 }
 
 async function load() {
@@ -213,5 +309,14 @@ p { color: var(--el-text-color-secondary); margin: 8px 0 0; }
 .scope { margin: 2px; }
 .secret { margin-top: 18px; }
 .el-checkbox { display: flex; margin: 8px 0; }
-@media (max-width: 767px) { .api-keys { padding: 20px; } .toolbar { align-items: flex-start; gap: 16px; } .toolbar-actions { flex-direction: column; } }
+.guide-document { padding-right: 12px; }
+.guide-document h3 { margin: 24px 0 8px; }
+.guide-document code { padding: 2px 5px; border-radius: 4px; background: var(--el-fill-color-light); }
+.guide-document pre { margin: 12px 0; padding: 14px; overflow-x: auto; border-radius: 6px; background: var(--el-fill-color-light); }
+.guide-document pre code { padding: 0; background: transparent; white-space: pre; }
+.guide-auth { margin: 0; }
+.guide-auth div { display: grid; grid-template-columns: 200px 1fr; gap: 12px; padding: 6px 0; }
+.guide-auth dt, .guide-auth dd { margin: 0; }
+.guide-note { font-size: 13px; }
+@media (max-width: 767px) { .api-keys { padding: 20px; } .toolbar { align-items: flex-start; gap: 16px; } .toolbar-actions { flex-direction: column; } .guide-auth div { grid-template-columns: 1fr; gap: 4px; } }
 </style>

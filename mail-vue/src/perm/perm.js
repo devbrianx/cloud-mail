@@ -131,6 +131,12 @@ const routers = {
 			name: 'temp-inbox',
 			component: () => import('@/views/temp-inbox/index.vue'),
 			meta: { title: 'temporaryInboxes', name: 'temp-inbox', menu: true }
+		},
+		{
+			path: '/temporary-inboxes/:inboxId/messages/:messageId',
+			name: 'temp-inbox-message',
+			component: () => import('@/views/temp-inbox/message.vue'),
+			meta: { title: 'temporaryInbox', name: 'temp-inbox-message', menu: false }
 		}
 	]
 }

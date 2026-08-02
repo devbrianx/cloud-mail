@@ -371,6 +371,21 @@ const en = {
     ,temporaryInboxesEmpty: 'No active temporary inboxes'
     ,selectTemporaryInbox: 'Select a temporary inbox'
     ,selectTemporaryMessage: 'Select a message'
+    ,apiGuideIntro: 'Create temporary inboxes with an AC- API key. Each inbox expires after 24 hours, and creation returns a temporary token bound to that inbox.'
+    ,apiGuideBaseUrl: 'Base URL'
+    ,apiGuideAuthentication: 'Authentication'
+    ,apiGuideApiKeyAuth: 'API-key operations'
+    ,apiGuideTokenAuth: 'Temporary-token operations'
+    ,apiGuideScopes: 'Scopes'
+    ,apiGuideCreateAccount: 'Create a temporary inbox'
+    ,apiGuideCreateAccountDesc: 'Requires inboxes:write. Replace the example domain with an enabled API domain and use an unused local part.'
+    ,apiGuideCreateResponse: 'A successful response includes id, address, expiresAt, and the creation-only token in data.'
+    ,apiGuideCurrentAccount: 'Read the current temporary inbox'
+    ,apiGuideCurrentAccountDesc: 'Use the token returned at creation. A temporary token can access only its bound inbox.'
+    ,apiGuideListMessages: 'List messages'
+    ,apiGuideListMessagesDesc: 'Requires messages:read. API-key message calls must include address and can access only inboxes created by that key.'
+    ,apiGuideRestrictions: 'Availability'
+    ,apiGuideRestrictionsDesc: 'Webhooks, persistent mailboxes, message sending, and automatic DNS provisioning are outside this API.'
 }
 
 export default en
