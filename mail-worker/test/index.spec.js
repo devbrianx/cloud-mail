@@ -61,6 +61,26 @@ describe('temporary inbox API compatibility', () => {
 		const deleted = await request(`/v1/messages/${message.id}?address=${encodeURIComponent(account.address)}`, apiOptions(key, 'DELETE')); expect(deleted.status).toBe(204);
 	});
 
+	it('extracts contextual alphanumeric codes without matching unrelated numbers', async () => {
+		await enable();
+		const key = await seedKey();
+		const account = (await (await request('/v1/accounts', apiOptions(key, 'POST', { domain: 'example.com', localPart: 'codes' }))).json()).data;
+		const messages = [
+			['SpaceXAI confirmation code: TXZ-J4E', '<p>Use confirmation code: <strong>TXZ-J4E</strong>. Sent in 2026.</p>', 'TXZ-J4E'],
+			['Monthly newsletter', '<p>The 2026 report contains 333333 subscribers.</p>', null],
+		];
+		for (const [subject, content] of messages) {
+			const raw = `From: Sender <sender@example.net>\r\nTo: ${account.address}\r\nSubject: ${subject}\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n${content}`;
+			await email({ to: account.address, raw: new ReadableStream({ start(controller) { controller.enqueue(encoder.encode(raw)); controller.close(); } }), setReject() {}, forward() {} }, env, {});
+		}
+		const list = (await (await request(`/v1/messages?address=${encodeURIComponent(account.address)}`, apiOptions(key))).json()).data.messages;
+		for (const [subject, , expectedCode] of messages) {
+			const message = list.find(item => item.subject === subject);
+			const detail = (await (await request(`/v1/messages/${message.id}?address=${encodeURIComponent(account.address)}`, apiOptions(key))).json()).data;
+			expect(detail.verificationCode).toBe(expectedCode);
+		}
+	});
+
 
 	it('records only successful API-key business calls', async () => {
 		await enable(); const key = await seedKey(); await request('/v1/openapi.json'); await request('/v1/accounts', apiOptions('AC_nope', 'POST', {})); await request('/v1/accounts', apiOptions(key, 'POST', { domain: 'example.com', localPart: 'usage' }));

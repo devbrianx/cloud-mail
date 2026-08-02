@@ -11,9 +11,16 @@ import emailUtils from '../utils/email-utils';
 import tempInboxService from './temp-inbox-service';
 
 function parseJson(value) { try { return JSON.parse(value || '[]'); } catch { return []; } }
+function codeFrom(content) {
+	const pattern = /(?:\b(?:verification|confirmation|security|temporary|one-time|otp)(?:\s+(?:code|pin|password))?|\bcode|验证码|校验码|确认码|动态码)(?:\s*(?:is|:|：|-|为|是))?\s*([a-z0-9]+(?:-[a-z0-9]+){0,2})/gi;
+	for (const match of content.matchAll(pattern)) {
+		const code = match[1].toUpperCase();
+		if (code.replaceAll('-', '').length >= 4 && code.replaceAll('-', '').length <= 8 && /[0-9-]/.test(code)) return code;
+	}
+	return null;
+}
 function verificationCode(row) {
-	const content = `${row.subject || ''}\n${row.text || ''}\n${emailUtils.htmlToText(row.content || '')}`;
-	return /(?<!\d)\d{4,8}(?!\d)/.exec(content)?.[0] || null;
+	return codeFrom(`${row.subject || ''}\n${row.text || ''}\n${emailUtils.htmlToText(row.content || '')}`);
 }
 function summary(row, attachmentCount) {
 	return { id: String(row.tempMessageId), inbox_id: row.tempInboxId, inboxId: row.tempInboxId, from: { name: row.name || '', address: row.sendEmail || '' }, to: parseJson(row.recipient), subject: row.subject || '', seen: row.unread === 1, starred: row.starred === 1, hasAttachments: attachmentCount > 0, size: row.size || 0, createdAt: row.createTime };
