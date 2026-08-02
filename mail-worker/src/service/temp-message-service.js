@@ -7,10 +7,14 @@ import tempAttachment from '../entity/temp-attachment';
 import r2Service from './r2-service';
 import fileUtils from '../utils/file-utils';
 import constant from '../const/constant';
+import emailUtils from '../utils/email-utils';
 import tempInboxService from './temp-inbox-service';
 
 function parseJson(value) { try { return JSON.parse(value || '[]'); } catch { return []; } }
-function verificationCode(row) { return new RegExp('(?<!\\d)\\d{4,8}(?!\\d)').exec(`${row.subject || ''}\n${row.text || ''}`)?.[0] || null; }
+function verificationCode(row) {
+	const content = `${row.subject || ''}\n${row.text || ''}\n${emailUtils.htmlToText(row.content || '')}`;
+	return /(?<!\d)\d{4,8}(?!\d)/.exec(content)?.[0] || null;
+}
 function summary(row, attachmentCount) {
 	return { id: String(row.tempMessageId), inbox_id: row.tempInboxId, inboxId: row.tempInboxId, from: { name: row.name || '', address: row.sendEmail || '' }, to: parseJson(row.recipient), subject: row.subject || '', seen: row.unread === 1, starred: row.starred === 1, hasAttachments: attachmentCount > 0, size: row.size || 0, createdAt: row.createTime };
 }

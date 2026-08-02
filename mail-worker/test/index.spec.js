@@ -61,6 +61,18 @@ describe('temporary inbox API compatibility', () => {
 		const deleted = await request(`/v1/messages/${message.id}?address=${encodeURIComponent(account.address)}`, apiOptions(key, 'DELETE')); expect(deleted.status).toBe(204);
 	});
 
+	it('extracts verification codes from HTML-only inbound messages', async () => {
+		await enable();
+		const key = await seedKey();
+		const account = (await (await request('/v1/accounts', apiOptions(key, 'POST', { domain: 'example.com', localPart: 'html-code' }))).json()).data;
+		const raw = `From: Sender <sender@example.net>\r\nTo: ${account.address}\r\nSubject: HTML verification\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<div>Your verification code is <strong>654321</strong>.</div>`;
+		await email({ to: account.address, raw: new ReadableStream({ start(controller) { controller.enqueue(encoder.encode(raw)); controller.close(); } }), setReject() {}, forward() {} }, env, {});
+		const list = (await (await request(`/v1/messages?address=${encodeURIComponent(account.address)}`, apiOptions(key))).json()).data.messages;
+		const detail = (await (await request(`/v1/messages/${list[0].id}?address=${encodeURIComponent(account.address)}`, apiOptions(key))).json()).data;
+		expect(detail.text).toBe('');
+		expect(detail.verificationCode).toBe('654321');
+	});
+
 	it('records only successful API-key business calls', async () => {
 		await enable(); const key = await seedKey(); await request('/v1/openapi.json'); await request('/v1/accounts', apiOptions('AC_nope', 'POST', {})); await request('/v1/accounts', apiOptions(key, 'POST', { domain: 'example.com', localPart: 'usage' }));
 		const apiKeyId = (await env.db.prepare(`SELECT api_key_id FROM api_key`).first()).api_key_id;
