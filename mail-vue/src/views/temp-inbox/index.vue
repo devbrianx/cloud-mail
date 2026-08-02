@@ -25,18 +25,36 @@
       <el-empty v-if="!loadingInboxes && !inboxes.length" :description="$t('temporaryInboxesEmpty')" />
     </section>
 
-    <section v-if="selectedInbox" class="message-panel">
-      <div class="panel-header"><h2>{{ selectedInbox.address }}</h2></div>
-      <el-table :data="messages" v-loading="loadingMessages" @row-click="openMessage">
-        <el-table-column prop="from.name" :label="$t('sender')" min-width="180">
-          <template #default="{ row }">{{ row.from.name || row.from.address }}</template>
-        </el-table-column>
-        <el-table-column prop="subject" :label="$t('subject')" min-width="220" />
-        <el-table-column :label="$t('date')" width="140">
-          <template #default="{ row }">{{ fromNow(row.createdAt) }}</template>
-        </el-table-column>
-      </el-table>
-      <el-empty v-if="!loadingMessages && !messages.length" :description="$t('noMessagesFound')" />
+    <section v-if="selectedInbox" class="message-panel" v-loading="loadingMessage">
+      <template v-if="message">
+        <div class="panel-header">
+          <el-button link @click="closeMessage">{{ $t('back') }}</el-button>
+          <h2>{{ message.subject || $t('noSubject') }}</h2>
+        </div>
+        <p><strong>{{ $t('sender') }}:</strong> {{ message.from.name || message.from.address }} &lt;{{ message.from.address }}&gt;</p>
+        <p><strong>{{ $t('recipient') }}:</strong> {{ recipients }}</p>
+        <p><strong>{{ $t('date') }}:</strong> {{ formatDetailDate(message.createdAt) }}</p>
+        <p v-if="message.verificationCode"><strong>{{ $t('codeLabel') }}</strong>{{ message.verificationCode }}</p>
+        <ShadowHtml v-if="message.html?.[0]" :html="message.html[0]" class="message-content" />
+        <pre v-else class="message-content">{{ message.text }}</pre>
+        <section v-if="message.attachments?.length" class="attachments">
+          <h3>{{ $t('attachments') }}</h3>
+          <div v-for="attachment in message.attachments" :key="attachment.id" class="attachment">{{ attachment.filename }} · {{ attachment.contentType }} · {{ formatBytes(attachment.size) }}</div>
+        </section>
+      </template>
+      <template v-else>
+        <div class="panel-header"><h2>{{ selectedInbox.address }}</h2></div>
+        <el-table :data="messages" v-loading="loadingMessages" @row-click="openMessage">
+          <el-table-column prop="from.name" :label="$t('sender')" min-width="180">
+            <template #default="{ row }">{{ row.from.name || row.from.address }}</template>
+          </el-table-column>
+          <el-table-column prop="subject" :label="$t('subject')" min-width="220" />
+          <el-table-column :label="$t('date')" width="140">
+            <template #default="{ row }">{{ fromNow(row.createdAt) }}</template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!loadingMessages && !messages.length" :description="$t('noMessagesFound')" />
+      </template>
     </section>
   </div>
 </template>
@@ -44,16 +62,17 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { useRoute, useRouter } from 'vue-router';
-import { tempInboxDelete, tempInboxList, tempInboxMessages } from '@/request/temp-inbox.js';
+import { useRoute } from 'vue-router';
+import ShadowHtml from '@/components/shadow-html/index.vue';
+import { tempInboxDelete, tempInboxList, tempInboxMessage, tempInboxMessages } from '@/request/temp-inbox.js';
 import { formatDetailDate, fromNow } from '@/utils/day.js';
+import { formatBytes } from '@/utils/file-utils.js';
 import { useI18n } from 'vue-i18n';
 
 defineOptions({ name: 'temp-inbox' });
 
 const { t } = useI18n();
 const route = useRoute();
-const router = useRouter();
 const pageSize = 50;
 const page = ref(0);
 const total = ref(0);
@@ -61,15 +80,21 @@ const inboxes = ref([]);
 const messages = ref([]);
 const selectedInbox = ref(null);
 const selectedInboxIds = ref([]);
+const selectedMessageId = ref(null);
+const message = ref(null);
 const loadingInboxes = ref(false);
 const loadingMessages = ref(false);
+const loadingMessage = ref(false);
 const deleting = ref(false);
+const recipients = computed(() => (message.value?.to || []).map(item => item.address).join(', '));
 const allSelected = computed(() => inboxes.value.length > 0 && inboxes.value.every(inbox => selectedInboxIds.value.includes(inbox.id)));
 const someSelected = computed(() => selectedInboxIds.value.length > 0 && !allSelected.value);
 
 function clearSelection() {
   selectedInbox.value = null;
+  selectedMessageId.value = null;
   messages.value = [];
+  message.value = null;
 }
 
 function toggleInbox(inboxId, selected) {
@@ -106,6 +131,8 @@ async function loadInboxes() {
 async function selectInbox(inbox) {
   if (selectedInbox.value?.id === inbox.id && messages.value.length) return;
   selectedInbox.value = inbox;
+  selectedMessageId.value = null;
+  message.value = null;
   messages.value = [];
   await loadMessages(inbox);
 }
@@ -125,9 +152,27 @@ async function loadMessages(inbox) {
   }
 }
 
-function openMessage(row) {
-  if (!selectedInbox.value) return;
-  router.push({ name: 'temp-inbox-message', params: { inboxId: selectedInbox.value.id, messageId: row.id } });
+async function openMessage(row) {
+  const inboxId = selectedInbox.value?.id;
+  if (!inboxId) return;
+  selectedMessageId.value = row.id;
+  loadingMessage.value = true;
+  try {
+    const data = await tempInboxMessage(inboxId, row.id);
+    if (selectedInbox.value?.id === inboxId && selectedMessageId.value === row.id) message.value = data;
+  } catch (error) {
+    if (error?.code === 404 && selectedInbox.value?.id === inboxId && selectedMessageId.value === row.id) {
+      closeMessage();
+      await loadMessages(selectedInbox.value);
+    }
+  } finally {
+    if (selectedInbox.value?.id === inboxId && selectedMessageId.value === row.id) loadingMessage.value = false;
+  }
+}
+
+function closeMessage() {
+  selectedMessageId.value = null;
+  message.value = null;
 }
 
 async function deleteSelected() {
@@ -173,5 +218,9 @@ loadInboxes();
 .inbox-card.selected { background: var(--choose-account-background); }
 .inbox-card-content { display: grid; gap: 6px; min-width: 0; color: var(--el-text-color-secondary); font-size: 13px; }
 .inbox-card-content strong { overflow: hidden; color: var(--el-text-color-primary); text-overflow: ellipsis; white-space: nowrap; }
+.message-content { min-height: 240px; margin: 20px 0; white-space: pre-wrap; word-break: break-word; }
+.attachments { border-top: 1px solid var(--el-border-color-lighter); padding-top: 16px; }
+.attachments h3 { margin-top: 0; }
+.attachment { padding: 8px 0; word-break: break-word; }
 @media (max-width: 767px) { .temporary-inboxes { grid-template-columns: 1fr; overflow: auto; } .mailbox-panel, .message-panel { min-height: 280px; border-right: 0; border-bottom: 1px solid var(--el-border-color-lighter); } }
 </style>

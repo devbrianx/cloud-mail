@@ -371,6 +371,7 @@ const en = {
     ,temporaryInboxesEmpty: 'No active temporary inboxes'
     ,selectTemporaryInbox: 'Select a temporary inbox'
     ,selectTemporaryMessage: 'Select a message'
+    ,back: 'Back'
     ,apiGuideIntro: 'Create temporary inboxes with an AC- API key. Each inbox expires after 24 hours, and creation returns a temporary token bound to that inbox.'
     ,apiGuideBaseUrl: 'Base URL'
     ,apiGuideAuthentication: 'Authentication'

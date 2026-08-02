@@ -371,6 +371,7 @@ const zh = {
     ,temporaryInboxesEmpty: '没有未过期的临时邮箱'
     ,selectTemporaryInbox: '请选择临时邮箱'
     ,selectTemporaryMessage: '请选择邮件'
+    ,back: '返回'
     ,apiGuideIntro: '使用 AC- API 密钥创建临时邮箱。每个邮箱 24 小时后到期，创建时会返回仅绑定该邮箱的临时 token。'
     ,apiGuideBaseUrl: '基础地址'
     ,apiGuideAuthentication: '认证方式'
