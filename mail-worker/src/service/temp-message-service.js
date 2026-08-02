@@ -12,7 +12,7 @@ import tempInboxService from './temp-inbox-service';
 
 function parseJson(value) { try { return JSON.parse(value || '[]'); } catch { return []; } }
 function codeFrom(content) {
-	const pattern = /(?:\b(?:verification|confirmation|security|temporary|one-time|otp)(?:\s+(?:code|pin|password))?|\bcode|验证码|校验码|确认码|动态码)(?:\s*(?:is|:|：|-|为|是))?\s*([a-z0-9]+(?:-[a-z0-9]+){0,2})/gi;
+	const pattern = /(?:\b(?:(?:verification|confirmation|security|temporary|one-time|one time|login|access|authentication|activation|reset)(?:\s+(?:code|pin|password))?|(?:otp|pin|passcode)(?:\s+code)?)\b|\bcode|验证码|校验码|确认码|动态码)(?:\s*(?:is|为|是))?\s*(?::|：|-)?\s*([a-z0-9]+(?:-[a-z0-9]+){0,2})/gi;
 	for (const match of content.matchAll(pattern)) {
 		const code = match[1].toUpperCase();
 		if (code.replaceAll('-', '').length >= 4 && code.replaceAll('-', '').length <= 8 && /[0-9-]/.test(code)) return code;
