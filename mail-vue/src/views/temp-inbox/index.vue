@@ -4,9 +4,9 @@
       <div class="panel-header">
         <h2>{{ $t('temporaryInboxes') }}</h2>
         <div class="panel-actions">
-          <el-button :disabled="!selectedInboxIds.length" type="danger" :loading="deleting" @click="deleteSelected">{{ $t('delete') }}</el-button>
-          <el-button @click="loadInboxes">{{ $t('refresh') }}</el-button>
-          <el-button type="primary" @click="openCreate">{{ $t('createTemporaryInbox') }}</el-button>
+          <el-tooltip :content="$t('delete')" placement="top"><el-button :disabled="!selectedInboxIds.length" type="danger" link :loading="deleting" @click="deleteSelected"><Icon icon="uiw:delete" width="16" height="18" /></el-button></el-tooltip>
+          <el-tooltip :content="$t('refresh')" placement="top"><el-button link @click="loadInboxes"><Icon icon="ion:reload" width="18" height="18" /></el-button></el-tooltip>
+          <el-tooltip :content="$t('createTemporaryInbox')" placement="top"><el-button type="primary" link @click="openCreate"><Icon icon="ion:add-outline" width="22" height="22" /></el-button></el-tooltip>
         </div>
       </div>
       <div v-if="inboxes.length" class="select-all">
@@ -64,6 +64,7 @@
           <el-option v-for="key in writableKeys" :key="key.apiKeyId" :label="key.name" :value="key.apiKeyId" />
         </el-select>
         <el-input v-model="createForm.localPart" :placeholder="$t('temporaryInboxLocalPart')" maxlength="63" autocomplete="off">
+          <template #suffix><Icon class="prefix-refresh" icon="bitcoin-icons:refresh-filled" width="20" height="20" @click.stop="generateLocalPart" /></template>
           <template #append>
             <el-select v-model="createForm.domain" :placeholder="$t('temporaryInboxDomain')" class="domain-select">
               <el-option v-for="domain in apiDomains" :key="domain" :label="domain" :value="domain" />
@@ -81,6 +82,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
+import { Icon } from '@iconify/vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRoute } from 'vue-router';
 import ShadowHtml from '@/components/shadow-html/index.vue';
@@ -134,6 +136,13 @@ function toggleAll(selected) {
   selectedInboxIds.value = selected ? inboxes.value.map(inbox => inbox.id) : [];
 }
 
+function generateLocalPart() {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  createForm.localPart = Array.from(bytes, byte => alphabet[byte % alphabet.length]).join('');
+}
+
 async function openCreate() {
   apiKeys.value = await apiKeyList();
   if (!writableKeys.value.length) {
@@ -142,6 +151,7 @@ async function openCreate() {
   }
   createForm.apiKeyId = writableKeys.value[0].apiKeyId;
   createForm.domain = apiDomains.value[0] || '';
+  generateLocalPart();
   createVisible.value = true;
 }
 
@@ -289,5 +299,7 @@ loadInboxes();
 .container { display: grid; gap: 14px; }
 .domain-select { width: 160px; }
 :deep(.domain-select .el-select__wrapper) { box-shadow: none; }
+.prefix-refresh { color: var(--el-text-color-secondary); cursor: pointer; }
+.prefix-refresh:hover { color: var(--el-color-primary); }
 @media (max-width: 767px) { .temporary-inboxes { grid-template-columns: 1fr; overflow: auto; } .mailbox-panel, .message-panel { min-height: 280px; border-right: 0; border-bottom: 1px solid var(--el-border-color-lighter); } }
 </style>

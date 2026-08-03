@@ -2,6 +2,7 @@ import app from '../hono/hono';
 import result from '../model/result';
 import userContext from '../security/user-context';
 import apiKeyService from '../service/api-key-service';
+import apiUsageService from '../service/api-usage-service';
 import tempInboxService from '../service/temp-inbox-service';
 import tempMessageService from '../service/temp-message-service';
 
@@ -25,6 +26,7 @@ app.post('/tempInbox', async c => {
 	}
 	const setting = await apiKeyService.requireEnabled(c);
 	const inbox = await tempInboxService.createForUser(c, userId, body.apiKeyId, body, setting);
+	await apiUsageService.recordSuccess(c, inbox.apiKeyId);
 	return c.json(result.ok(tempInboxService.toApiInbox(inbox)), 201);
 });
 

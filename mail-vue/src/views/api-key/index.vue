@@ -20,7 +20,7 @@
       <el-table-column prop="createTime" :label="$t('date')" min-width="180" />
       <el-table-column prop="todayCalls" :label="$t('apiKeyTodayCalls')" width="110" />
       <el-table-column prop="last30DaysCalls" :label="$t('apiKeyLast30DaysCalls')" width="130" />
-      <el-table-column :label="$t('action')" width="150"><template #default="{ row }"><el-button type="danger" link @click="deleteKey(row)">{{ $t('deleteApiKey') }}</el-button></template></el-table-column>
+      <el-table-column :label="$t('action')" width="92"><template #default="{ row }"><div class="table-actions"><el-tooltip :content="$t('copy')" placement="top"><el-button link @click="copyKeyPrefix(row)"><Icon icon="fluent:copy-20-regular" width="18" height="18" /></el-button></el-tooltip><el-tooltip :content="$t('deleteApiKey')" placement="top"><el-button type="danger" link @click="deleteKey(row)"><Icon icon="uiw:delete" width="16" height="18" /></el-button></el-tooltip></div></template></el-table-column>
     </el-table>
 
     <el-dialog v-model="createVisible" :title="$t('createApiKey')" width="420" @closed="resetCreate">
@@ -97,6 +97,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
+import { Icon } from '@iconify/vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { apiKeyCreate, apiKeyList, apiKeyDelete } from '@/request/api-key.js';
 import { useI18n } from 'vue-i18n';
@@ -354,6 +355,14 @@ async function copyText(value) {
   }
   ElMessage({ type: 'success', message: t('copySuccessMsg') });
 }
+
+async function copyKeyPrefix(row) {
+  try {
+    await copyText(row.prefix);
+  } catch {
+    ElMessage({ type: 'error', message: t('copyFailMsg') });
+  }
+}
 async function copySecret() {
   try {
     await copyText(secret.value);
@@ -369,6 +378,8 @@ onMounted(load);
 .api-keys { padding: 28px; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
 .toolbar-actions { display: flex; gap: 10px; }
+.table-actions { display: flex; align-items: center; gap: 8px; }
+.table-actions .el-button { margin: 0; }
 h2 { margin: 0; }
 .api-keys > p, .toolbar p { color: var(--el-text-color-secondary); margin: 8px 0 0; }
 .scope { margin: 2px; }
