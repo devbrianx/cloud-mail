@@ -4,6 +4,10 @@ export function tempInboxList(params) {
   return http.get('/tempInbox/list', { params });
 }
 
+export function tempInboxCreate(form) {
+  return http.post('/tempInbox', form);
+}
+
 export function tempInboxMessages(inboxId, params) {
   return http.get(`/tempInbox/${encodeURIComponent(inboxId)}/messages`, { params });
 }

@@ -15,6 +15,19 @@ app.get('/tempInbox/list', async c => {
 	return c.json(result.ok(await tempInboxService.listActiveByUser(c, userId, c.req.query())));
 });
 
+app.post('/tempInbox', async c => {
+	const userId = await requireEnabledUser(c);
+	let body;
+	try {
+		body = await c.req.json();
+	} catch {
+		body = {};
+	}
+	const setting = await apiKeyService.requireEnabled(c);
+	const inbox = await tempInboxService.createForUser(c, userId, body.apiKeyId, body, setting);
+	return c.json(result.ok(tempInboxService.toApiInbox(inbox)), 201);
+});
+
 app.get('/tempInbox/:inboxId/messages', async c => {
 	const userId = await requireEnabledUser(c);
 	const inbox = await tempInboxService.requireActiveOwnedByUser(c, userId, c.req.param('inboxId'));

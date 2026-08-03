@@ -268,7 +268,8 @@ const settingService = {
 			linuxdoSwitch: settingRow.linuxdoSwitch,
 			minEmailPrefix: settingRow.minEmailPrefix,
 			projectLink: settingRow.projectLink,
-			apiEnabled: settingRow.apiEnabled
+			apiEnabled: settingRow.apiEnabled,
+			apiDomains: settingRow.apiDomains
 		};
 	},
 

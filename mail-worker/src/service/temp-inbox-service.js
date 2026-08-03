@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import orm from '../entity/orm';
+import apiKey from '../entity/api-key';
 import tempInbox from '../entity/temp-inbox';
 import tempMessage from '../entity/temp-message';
 import tempAttachment from '../entity/temp-attachment';
@@ -101,6 +102,21 @@ const tempInboxService = {
 		]);
 		const list = await Promise.all(rows.map(async row => ({ ...this.toApiInbox(row), messageCount: (await orm(c).select({ total: count() }).from(tempMessage).where(and(eq(tempMessage.tempInboxId, row.tempInboxId), eq(tempMessage.isDeleted, 0))).get()).total })));
 		return { list, total };
+	},
+
+	async createForUser(c, userId, apiKeyId, input, setting) {
+		const keyId = Number(apiKeyId);
+		if (!Number.isInteger(keyId) || keyId < 1) throw new BizError('API key is invalid', 400);
+		const key = await orm(c).select().from(apiKey).where(and(eq(apiKey.apiKeyId, keyId), eq(apiKey.userId, userId))).get();
+		if (!key) throw new BizError('API key not found', 404);
+		let scopes;
+		try {
+			scopes = JSON.parse(key.scopes);
+		} catch {
+			throw new BizError('API key scope is invalid', 400);
+		}
+		if (!Array.isArray(scopes) || !scopes.includes('inboxes:write')) throw new BizError('API key scope is insufficient', 403);
+		return await this.createCompatible(c, { apiKeyId: key.apiKeyId, userId }, input, setting.apiDomains, setting.apiWildcardDomains);
 	},
 
 	async requireActiveOwnedByUser(c, userId, inboxId) {

@@ -6,6 +6,7 @@
         <div class="panel-actions">
           <el-button :disabled="!selectedInboxIds.length" type="danger" :loading="deleting" @click="deleteSelected">{{ $t('delete') }}</el-button>
           <el-button @click="loadInboxes">{{ $t('refresh') }}</el-button>
+          <el-button type="primary" @click="openCreate">{{ $t('createTemporaryInbox') }}</el-button>
         </div>
       </div>
       <div v-if="inboxes.length" class="select-all">
@@ -56,24 +57,46 @@
         <el-empty v-if="!loadingMessages && !messages.length" :description="$t('noMessagesFound')" />
       </template>
     </section>
+
+    <el-dialog v-model="createVisible" :title="$t('createTemporaryInbox')" width="420" @closed="resetCreate">
+      <div class="container">
+        <el-select v-model="createForm.apiKeyId" :placeholder="$t('temporaryInboxApiKey')" style="width: 100%">
+          <el-option v-for="key in writableKeys" :key="key.apiKeyId" :label="key.name" :value="key.apiKeyId" />
+        </el-select>
+        <el-input v-model="createForm.localPart" :placeholder="$t('temporaryInboxLocalPart')" maxlength="63" autocomplete="off">
+          <template #append>
+            <el-select v-model="createForm.domain" :placeholder="$t('temporaryInboxDomain')" class="domain-select">
+              <el-option v-for="domain in apiDomains" :key="domain" :label="domain" :value="domain" />
+            </el-select>
+          </template>
+        </el-input>
+      </div>
+      <template #footer>
+        <el-button @click="createVisible = false">{{ $t('cancel') }}</el-button>
+        <el-button type="primary" :loading="creating" @click="createInbox">{{ $t('createTemporaryInbox') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRoute } from 'vue-router';
 import ShadowHtml from '@/components/shadow-html/index.vue';
-import { tempInboxDelete, tempInboxList, tempInboxMessage, tempInboxMessages } from '@/request/temp-inbox.js';
+import { apiKeyList } from '@/request/api-key.js';
+import { tempInboxCreate, tempInboxDelete, tempInboxList, tempInboxMessage, tempInboxMessages } from '@/request/temp-inbox.js';
 import { formatDetailDate, fromNow } from '@/utils/day.js';
 import { formatBytes } from '@/utils/file-utils.js';
 import { useI18n } from 'vue-i18n';
+import { useSettingStore } from '@/store/setting.js';
 
 defineOptions({ name: 'temp-inbox' });
 
 const { t } = useI18n();
 const route = useRoute();
 const pageSize = 50;
+const settingStore = useSettingStore();
 const page = ref(0);
 const total = ref(0);
 const inboxes = ref([]);
@@ -86,9 +109,15 @@ const loadingInboxes = ref(false);
 const loadingMessages = ref(false);
 const loadingMessage = ref(false);
 const deleting = ref(false);
+const createVisible = ref(false);
+const creating = ref(false);
+const apiKeys = ref([]);
+const createForm = reactive({ apiKeyId: null, localPart: '', domain: '' });
 const recipients = computed(() => (message.value?.to || []).map(item => item.address).join(', '));
 const allSelected = computed(() => inboxes.value.length > 0 && inboxes.value.every(inbox => selectedInboxIds.value.includes(inbox.id)));
 const someSelected = computed(() => selectedInboxIds.value.length > 0 && !allSelected.value);
+const writableKeys = computed(() => apiKeys.value.filter(key => key.scopes.includes('inboxes:write')));
+const apiDomains = computed(() => settingStore.settings.apiDomains || []);
 
 function clearSelection() {
   selectedInbox.value = null;
@@ -103,6 +132,41 @@ function toggleInbox(inboxId, selected) {
 
 function toggleAll(selected) {
   selectedInboxIds.value = selected ? inboxes.value.map(inbox => inbox.id) : [];
+}
+
+async function openCreate() {
+  apiKeys.value = await apiKeyList();
+  if (!writableKeys.value.length) {
+    ElMessage({ type: 'warning', message: t('temporaryInboxKeyRequired') });
+    return;
+  }
+  createForm.apiKeyId = writableKeys.value[0].apiKeyId;
+  createForm.domain = apiDomains.value[0] || '';
+  createVisible.value = true;
+}
+
+function resetCreate() {
+  createForm.apiKeyId = null;
+  createForm.localPart = '';
+  createForm.domain = '';
+}
+
+async function createInbox() {
+  if (!createForm.apiKeyId || !createForm.domain) {
+    ElMessage({ type: 'error', message: t('reqFailErrorMsg') });
+    return;
+  }
+  creating.value = true;
+  try {
+    const inbox = await tempInboxCreate({ ...createForm });
+    createVisible.value = false;
+    page.value = 0;
+    selectedInbox.value = inbox;
+    await loadInboxes();
+    ElMessage({ type: 'success', message: t('addSuccessMsg') });
+  } finally {
+    creating.value = false;
+  }
 }
 
 async function loadInboxes() {
@@ -222,5 +286,8 @@ loadInboxes();
 .attachments { border-top: 1px solid var(--el-border-color-lighter); padding-top: 16px; }
 .attachments h3 { margin-top: 0; }
 .attachment { padding: 8px 0; word-break: break-word; }
+.container { display: grid; gap: 14px; }
+.domain-select { width: 160px; }
+:deep(.domain-select .el-select__wrapper) { box-shadow: none; }
 @media (max-width: 767px) { .temporary-inboxes { grid-template-columns: 1fr; overflow: auto; } .mailbox-panel, .message-panel { min-height: 280px; border-right: 0; border-bottom: 1px solid var(--el-border-color-lighter); } }
 </style>
