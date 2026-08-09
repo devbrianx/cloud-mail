@@ -24,4 +24,8 @@ import '../api/temporary-identity-api'
 import '../api/v1-api'
 import '../api/telegram-api'
 import '../api/oauth-api'
+import '../api/outlook-account-api'
+import '../api/outlook-group-api'
+import '../api/outlook-tag-api'
+import '../api/outlook-sync-api'
 export default app;

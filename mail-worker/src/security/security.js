@@ -64,7 +64,11 @@ const requirePerms = [
 	'/regKey/history',
 	'/apiKey',
 	'/tempInbox',
-	'/temporaryIdentity'
+	'/temporaryIdentity',
+	'/outlookAccount',
+	'/outlookGroup',
+	'/outlookTag',
+	'/outlookSync'
 ];
 
 const premKey = {
@@ -99,6 +103,19 @@ const premKey = {
 	'temporary-identity:add': ['/temporaryIdentity/country/add', '/temporaryIdentity/add'],
 	'temporary-identity:set': ['/temporaryIdentity/country/set', '/temporaryIdentity/set'],
 	'temporary-identity:delete': ['/temporaryIdentity/country/delete', '/temporaryIdentity/delete']
+	,'outlook-account:query': ['/outlookAccount/list']
+	,'outlook-account:add': ['/outlookAccount/oauth/start', '/outlookAccount/import']
+	,'outlook-account:set': ['/outlookAccount/set']
+	,'outlook-account:delete': ['/outlookAccount/delete']
+	,'outlook-group:query': ['/outlookGroup/list']
+	,'outlook-group:add': ['/outlookGroup/add']
+	,'outlook-group:set': ['/outlookGroup/set']
+	,'outlook-group:delete': ['/outlookGroup/delete']
+	,'outlook-tag:query': ['/outlookTag/list']
+	,'outlook-tag:add': ['/outlookTag/add']
+	,'outlook-tag:set': ['/outlookTag/set']
+	,'outlook-tag:delete': ['/outlookTag/delete']
+	,'outlook-sync:run': ['/outlookSync/run', '/outlookSync/status']
 };
 
 app.use('*', async (c, next) => {

@@ -105,8 +105,22 @@ const en = {
 		"临时身份": "Temporary Identities",
 		"临时身份查看": "View Temporary Identities",
 		"临时身份添加": "Add Temporary Identities",
-		"临时身份修改": "Edit Temporary Identities",
-		"临时身份删除": "Delete Temporary Identities"
+		'临时身份修改': 'Edit Temporary Identities',
+		'临时身份删除': 'Delete Temporary Identities',
+		'Outlook 邮箱管理': 'Outlook Mailbox Management',
+		'Outlook 账号查看': 'View Outlook Accounts',
+		'Outlook 账号添加': 'Add Outlook Accounts',
+		'Outlook 账号修改': 'Edit Outlook Accounts',
+		'Outlook 账号删除': 'Delete Outlook Accounts',
+		'Outlook 分组查看': 'View Outlook Groups',
+		'Outlook 分组添加': 'Add Outlook Groups',
+		'Outlook 分组修改': 'Edit Outlook Groups',
+		'Outlook 分组删除': 'Delete Outlook Groups',
+		'Outlook 标签查看': 'View Outlook Tags',
+		'Outlook 标签添加': 'Add Outlook Tags',
+		'Outlook 标签修改': 'Edit Outlook Tags',
+		'Outlook 标签删除': 'Delete Outlook Tags',
+		'Outlook 邮件同步': 'Sync Outlook Mail'
 	}
 };
 

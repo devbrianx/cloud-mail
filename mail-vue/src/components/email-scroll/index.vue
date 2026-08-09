@@ -294,7 +294,8 @@ const props = defineProps({
   showUnread: {
     type: Boolean,
     default: false
-  }
+  },
+  refreshBefore: Function
 })
 
 const emit = defineEmits(['jump', 'refresh-before', 'delete-draft', 'right-search'])
@@ -893,8 +894,8 @@ function handleList(list) {
   })
 }
 
-function refresh() {
-  emit('refresh-before')
+async function refresh() {
+  await props.refreshBefore?.()
   if (props.skeleton) {
     scrollbarRef.value.setScrollTop(0)
   }

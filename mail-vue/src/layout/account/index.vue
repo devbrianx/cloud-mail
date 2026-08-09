@@ -136,6 +136,7 @@ import {
   accountSetAllReceive,
   accountSetAsTop
 } from "@/request/account.js";
+import {outlookSyncRun} from '@/request/outlook-account.js';
 import {sleep} from "@/utils/time-utils.js"
 import {isEmail} from "@/utils/verify-utils.js";
 import {useSettingStore} from "@/store/setting.js";
@@ -184,6 +185,10 @@ const mySelect = ref()
 if (hasPerm('account:query')) {
   getAccountList()
 }
+
+watch(() => accountStore.refreshVersion, () => {
+  refresh()
+})
 
 watch(() => accountStore.changeUserAccountName, () => {
   accounts[0].name = accountStore.changeUserAccountName
@@ -337,8 +342,14 @@ function refresh() {
   accounts.splice(0, accounts.length)
   getAccountList()
 }
-
-function changeAccount(account) {
+async function changeAccount(account) {
+  if (hasPerm('outlook-sync:run')) {
+    try {
+      await outlookSyncRun({accountId: account.accountId})
+    } catch (error) {
+      ElMessage({message: t('outlookSyncFailed'), type: 'error', plain: true})
+    }
+  }
   accountStore.currentAccountId = account.accountId
   accountStore.currentAccount = account
 }

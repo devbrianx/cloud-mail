@@ -35,6 +35,7 @@ const dbInit = {
 		await this.v3_3DB(c);
 		await this.v3_4DB(c);
 		await this.v3_5DB(c);
+		await this.v3_6DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -180,6 +181,27 @@ const dbInit = {
 		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS temporary_identity_country (country TEXT PRIMARY KEY, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();
 		await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS temporary_identity_country_updated_idx ON temporary_identity(country, update_time)`).run();
 		await c.env.db.prepare(`INSERT OR IGNORE INTO temporary_identity_country(country) SELECT DISTINCT country FROM temporary_identity WHERE trim(country) <> ''`).run();
+	},
+
+	async v3_6DB(c) {
+		for (const statement of [
+			`CREATE TABLE IF NOT EXISTS outlook_account (outlook_account_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, email TEXT NOT NULL COLLATE NOCASE, client_id TEXT NOT NULL, client_secret_ciphertext TEXT NOT NULL, refresh_token_ciphertext TEXT NOT NULL, group_id INTEGER, delta_link TEXT NOT NULL DEFAULT '', sync_status TEXT NOT NULL DEFAULT 'ready', sync_error TEXT NOT NULL DEFAULT '', last_sync_time TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, is_del INTEGER NOT NULL DEFAULT 0, UNIQUE(user_id, email))`,
+			`CREATE TABLE IF NOT EXISTS outlook_group (outlook_group_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL COLLATE NOCASE, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, name))`,
+			`CREATE TABLE IF NOT EXISTS outlook_tag (outlook_tag_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL COLLATE NOCASE, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, name))`,
+			`CREATE TABLE IF NOT EXISTS outlook_account_tag (outlook_account_id INTEGER NOT NULL, outlook_tag_id INTEGER NOT NULL, PRIMARY KEY(outlook_account_id, outlook_tag_id))`,
+			`CREATE TABLE IF NOT EXISTS outlook_message (outlook_account_id INTEGER NOT NULL, graph_message_id TEXT NOT NULL, email_id INTEGER NOT NULL, PRIMARY KEY(outlook_account_id, graph_message_id))`
+		]) await c.env.db.prepare(statement).run();
+		for (const statement of [
+			`CREATE INDEX IF NOT EXISTS outlook_account_user_group_idx ON outlook_account(user_id, is_del, group_id)`,
+			`CREATE INDEX IF NOT EXISTS outlook_account_user_idx ON outlook_account(user_id, is_del)`,
+			`CREATE INDEX IF NOT EXISTS outlook_account_tag_tag_idx ON outlook_account_tag(outlook_tag_id)`,
+			`CREATE INDEX IF NOT EXISTS outlook_message_email_idx ON outlook_message(email_id)`
+		]) await c.env.db.prepare(statement).run();
+		await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT 'Outlook 邮箱管理', NULL, 0, 1, 5.4 WHERE NOT EXISTS (SELECT 1 FROM perm WHERE name = 'Outlook 邮箱管理' AND perm_key IS NULL AND pid = 0)`).run();
+		const parent = await c.env.db.prepare(`SELECT perm_id FROM perm WHERE name = 'Outlook 邮箱管理' AND perm_key IS NULL AND pid = 0`).first();
+		for (const [name, key, sort] of [['Outlook 账号查看', 'outlook-account:query', 0], ['Outlook 账号添加', 'outlook-account:add', 1], ['Outlook 账号修改', 'outlook-account:set', 2], ['Outlook 账号删除', 'outlook-account:delete', 3], ['Outlook 分组查看', 'outlook-group:query', 4], ['Outlook 分组添加', 'outlook-group:add', 5], ['Outlook 分组修改', 'outlook-group:set', 6], ['Outlook 分组删除', 'outlook-group:delete', 7], ['Outlook 标签查看', 'outlook-tag:query', 8], ['Outlook 标签添加', 'outlook-tag:add', 9], ['Outlook 标签修改', 'outlook-tag:set', 10], ['Outlook 标签删除', 'outlook-tag:delete', 11], ['Outlook 邮件同步', 'outlook-sync:run', 12]]) {
+			await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT ?, ?, ?, 2, ? WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = ?)`).bind(name, key, parent.perm_id, sort, key).run();
+		}
 	},
 
 	async v2_9DB(c) {

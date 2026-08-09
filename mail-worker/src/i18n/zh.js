@@ -106,7 +106,21 @@ const zh = {
 		'临时身份查看': '查看临时身份',
 		'临时身份添加': '添加临时身份',
 		'临时身份修改': '修改临时身份',
-		'临时身份删除': '删除临时身份'
+		'临时身份删除': '删除临时身份',
+		'Outlook 邮箱管理': 'Outlook 邮箱管理',
+		'Outlook 账号查看': '查看 Outlook 账号',
+		'Outlook 账号添加': '添加 Outlook 账号',
+		'Outlook 账号修改': '修改 Outlook 账号',
+		'Outlook 账号删除': '删除 Outlook 账号',
+		'Outlook 分组查看': '查看 Outlook 分组',
+		'Outlook 分组添加': '添加 Outlook 分组',
+		'Outlook 分组修改': '修改 Outlook 分组',
+		'Outlook 分组删除': '删除 Outlook 分组',
+		'Outlook 标签查看': '查看 Outlook 标签',
+		'Outlook 标签添加': '添加 Outlook 标签',
+		'Outlook 标签修改': '修改 Outlook 标签',
+		'Outlook 标签删除': '删除 Outlook 标签',
+		'Outlook 邮件同步': '同步 Outlook 邮件'
 	}
 }
 
