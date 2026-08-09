@@ -6,6 +6,7 @@ import apiKeyService from '../src/service/api-key-service';
 import KvConst from '../src/const/kv-const';
 import permService from '../src/service/perm-service';
 import { dbInit } from '../src/init/init';
+import jwtUtils from '../src/utils/jwt-utils';
 
 const encoder = new TextEncoder();
 
@@ -14,6 +15,19 @@ async function hash(value) { const digest = await crypto.subtle.digest('SHA-256'
 async function request(path, options = {}) { const ctx = createExecutionContext(); const response = await worker.fetch(new Request(`http://example.test${path}`, options), env, ctx); await waitOnExecutionContext(ctx); return response; }
 function apiOptions(secret, method = 'GET', body) { return { method, headers: { 'X-API-Key': secret, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) }; }
 async function enable() { await env.kv.put('setting:', JSON.stringify({ ...(await env.kv.get('setting:', { type: 'json' })), apiEnabled: 0 })); }
+
+async function authOptions(userId, permKeys = [], method = 'GET', body) {
+	await dbInit.v3_5DB({ env });
+	const tokenId = `token-${userId}-${permKeys.join('-') || 'none'}`;
+	const token = await jwtUtils.generateToken({ env }, { userId, token: tokenId });
+	const user = await env.db.prepare(`SELECT * FROM user WHERE user_id = ?`).bind(userId).first();
+	await env.kv.put(`auth-uid:${userId}`, JSON.stringify({ tokens: [tokenId], user: { userId, email: user.email }, refreshTime: new Date().toISOString() }));
+	for (const permKey of permKeys) {
+		const perm = await env.db.prepare(`SELECT perm_id FROM perm WHERE perm_key = ?`).bind(permKey).first();
+		await env.db.prepare(`INSERT INTO role_perm(role_id, perm_id) VALUES (?, ?)`).bind(user.type, perm.perm_id).run();
+	}
+	return { method, headers: { Authorization: token, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) };
+}
 
 describe('temporary inbox API compatibility', () => {
 	it('publishes public documentation while disabled', async () => {
@@ -89,5 +103,52 @@ describe('temporary inbox API compatibility', () => {
 	});
 
 	it('seeds the API key permission tree idempotently', async () => { await dbInit.v3_1DB({ env }); await dbInit.v3_1DB({ env }); const tree = await permService.tree({ env }); expect(tree.find(item => item.name === '临时邮箱 API').children.map(item => item.permKey)).toEqual(['api-key:query']); });
+	it('encrypts new API keys while leaving legacy secrets unavailable', async () => {
+		const context = { env, get() { return undefined; }, set() {} };
+		const created = await apiKeyService.create(context, 1, { name: 'encrypted', scopes: ['inboxes:read'] });
+		const row = await env.db.prepare(`SELECT secret_ciphertext FROM api_key WHERE api_key_id = ?`).bind(created.apiKeyId).first();
+		expect(row.secret_ciphertext).not.toContain(created.secret);
+		expect(created.prefix).toBe(`${created.secret.slice(0, 8)}***${created.secret.slice(-4)}`);
+		const stored = (await apiKeyService.list(context, 1)).find(key => key.apiKeyId === created.apiKeyId);
+		expect(stored.secret).toBe(created.secret);
+		expect(stored.prefix).toBe(created.prefix);
+		expect((await apiKeyService.authenticate(context, created.secret)).apiKeyId).toBe(created.apiKeyId);
+		const legacySecret = await seedKey('AC-legacy-secret');
+		expect((await apiKeyService.list(context, 1)).find(key => key.prefix === legacySecret.slice(0, 8)).secret).toBeNull();
+	});
+
+	it('groups temporary identities by managed country', async () => {
+		await dbInit.v3_4DB({ env });
+		await env.db.prepare(`INSERT INTO temporary_identity(rowkey, data) VALUES ('legacy', '{}')`).run();
+		await dbInit.v3_5DB({ env }); await dbInit.v3_5DB({ env });
+		expect((await env.db.prepare(`SELECT country FROM temporary_identity WHERE rowkey = 'legacy'`).first()).country).toBe('未分类');
+		expect((await env.db.prepare(`SELECT country FROM temporary_identity_country WHERE country = '未分类'`).first()).country).toBe('未分类');
+		const tree = await permService.tree({ env });
+		expect(tree.find(item => item.name === '临时身份').children.map(item => item.permKey)).toEqual(['temporary-identity:query', 'temporary-identity:add', 'temporary-identity:set', 'temporary-identity:delete']);
+		await env.db.prepare(`INSERT INTO role(role_id, name, key) VALUES (2, 'query-only', '')`).run();
+		await env.db.prepare(`INSERT INTO user(user_id, email, type) VALUES (3, 'query@example.com', 2)`).run();
+		for (const country of ['美国', '韩国', '日本']) expect((await request('/api/temporaryIdentity/country/add', await authOptions(1, ['temporary-identity:add'], 'POST', { country }))).status).toBe(200);
+		const record = { Full_Name: 'Mick Eli U', Gender: 'Male', Temporary_mail: 'boofxekkzc@iubridge.com', Username: 'weaponlaughable', Address: 'Istanbul address', Address_Alias: 'Alias address', Trans_Address: 'Translated address', Trans_Cn_Address: '中文地址', City: 'Istanbul', Password: 'v8Yb1xkxQUsF', Credit_Card_Number: '04929885152148429', CVV2: '251', Custom_Field: 'preserve me' };
+		const denied = await request('/api/temporaryIdentity/countries', await authOptions(3)); expect((await denied.json()).code).toBe(403);
+		const missingCountry = await request('/api/temporaryIdentity/add', await authOptions(1, ['temporary-identity:add'], 'POST', { data: record })); expect((await missingCountry.json()).code).toBe(400);
+		const unknownCountry = await request('/api/temporaryIdentity/add', await authOptions(1, ['temporary-identity:add'], 'POST', { country: '不存在', data: record })); expect((await unknownCountry.json()).code).toBe(400);
+		const created = [];
+		for (const [country, name] of [['美国', 'Alice'], ['韩国', 'Kim One'], ['韩国', 'Kim Two']]) {
+			const response = await request('/api/temporaryIdentity/add', await authOptions(1, ['temporary-identity:add'], 'POST', { country, data: { ...record, Full_Name: name, Country: '错误国家' } }));
+			created.push((await response.json()).data);
+		}
+		const countries = (await (await request('/api/temporaryIdentity/countries', await authOptions(3, ['temporary-identity:query']))).json()).data.list;
+		expect(countries.find(item => item.country === '美国').count).toBe(1); expect(countries.find(item => item.country === '韩国').count).toBe(2);
+		const korean = (await (await request('/api/temporaryIdentity/list?country=韩国', await authOptions(3, ['temporary-identity:query']))).json()).data; expect(korean.list).toHaveLength(2);
+		const noCountry = await request('/api/temporaryIdentity/list', await authOptions(3, ['temporary-identity:query'])); expect((await noCountry.json()).code).toBe(400);
+		const detail = (await (await request(`/api/temporaryIdentity/detail/${created[1].rowkey}`, await authOptions(3, ['temporary-identity:query']))).json()).data; expect(detail).toMatchObject({ Country: '韩国', Address_Alias: record.Address_Alias, Trans_Address: record.Trans_Address, Trans_Cn_Address: record.Trans_Cn_Address });
+		const queryOnlyAdd = await request('/api/temporaryIdentity/add', await authOptions(3, ['temporary-identity:query'], 'POST', { country: '美国', data: record })); expect((await queryOnlyAdd.json()).code).toBe(403);
+		const renamed = await request('/api/temporaryIdentity/country/set/韩国', await authOptions(1, ['temporary-identity:set'], 'PUT', { country: '韩国共和国' })); expect((await renamed.json()).data.country).toBe('韩国共和国');
+		const renamedDetail = (await (await request(`/api/temporaryIdentity/detail/${created[1].rowkey}`, await authOptions(3, ['temporary-identity:query']))).json()).data; expect(renamedDetail.Country).toBe('韩国共和国');
+		const blockedDelete = await request('/api/temporaryIdentity/country/delete/韩国共和国', await authOptions(1, ['temporary-identity:delete'], 'DELETE')); expect((await blockedDelete.json()).code).toBe(409);
+		const deletedJapan = await request('/api/temporaryIdentity/country/delete/日本', await authOptions(1, ['temporary-identity:delete'], 'DELETE')); expect((await deletedJapan.json()).data.deleted).toBe(1);
+		const badData = await request('/api/temporaryIdentity/add', await authOptions(1, ['temporary-identity:add'], 'POST', { country: '美国', data: { Full_Name: ['array'] } })); expect((await badData.json()).code).toBe(400);
+		const deleted = await request('/api/temporaryIdentity/delete', await authOptions(1, ['temporary-identity:delete'], 'DELETE', { rowkeys: created.map(item => item.rowkey) })); expect((await deleted.json()).data.deleted).toBe(3);
+	});
 	it('removes expired inboxes through the scheduled handler', async () => { await enable(); const key = await seedKey(); const account = (await (await request('/v1/accounts', apiOptions(key, 'POST', { domain: 'example.com', localPart: 'expired' }))).json()).data; await env.db.prepare('UPDATE temp_inbox SET expires_at = ? WHERE temp_inbox_id = ?').bind(new Date(0).toISOString(), account.id).run(); const controller = createScheduledController({ scheduledTime: new Date(), cron: '0 * * * *' }); const ctx = createExecutionContext(); await worker.scheduled(controller, env, ctx); await waitOnExecutionContext(ctx); expect(await env.db.prepare('SELECT temp_inbox_id FROM temp_inbox WHERE temp_inbox_id = ?').bind(account.id).first()).toBeNull(); });
 });

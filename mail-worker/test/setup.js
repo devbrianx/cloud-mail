@@ -9,6 +9,8 @@ const schema = [
 	`DROP TABLE IF EXISTS temp_attachment`,
 	`DROP TABLE IF EXISTS temp_message`,
 	`DROP TABLE IF EXISTS temp_inbox`,
+	`DROP TABLE IF EXISTS temporary_identity`,
+	`DROP TABLE IF EXISTS temporary_identity_country`,
 	`DROP TABLE IF EXISTS api_key`,
 	`DROP TABLE IF EXISTS temp_token`,
 	`DROP TABLE IF EXISTS api_key_usage`,
@@ -24,12 +26,14 @@ const schema = [
 	`CREATE TABLE role (role_id INTEGER PRIMARY KEY, name TEXT NOT NULL, key TEXT, description TEXT, ban_email TEXT NOT NULL DEFAULT '', ban_email_type INTEGER NOT NULL DEFAULT 0, avail_domain TEXT NOT NULL DEFAULT '', sort INTEGER DEFAULT 0, is_default INTEGER DEFAULT 0, send_count INTEGER, send_type TEXT NOT NULL DEFAULT 'count', account_count INTEGER)`,
 	`CREATE TABLE perm (perm_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, perm_key TEXT, pid INTEGER NOT NULL DEFAULT 0, type INTEGER NOT NULL DEFAULT 2, sort REAL)`,
 	`CREATE TABLE role_perm (id INTEGER PRIMARY KEY AUTOINCREMENT, role_id INTEGER, perm_id INTEGER)`,
-	`CREATE TABLE api_key (api_key_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL, secret_hash TEXT NOT NULL UNIQUE, secret_prefix TEXT NOT NULL, scopes TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+	`CREATE TABLE api_key (api_key_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL, secret_hash TEXT NOT NULL UNIQUE, secret_prefix TEXT NOT NULL, secret_ciphertext TEXT NOT NULL DEFAULT '', scopes TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 	`CREATE TABLE temp_inbox (temp_inbox_id TEXT PRIMARY KEY, api_key_id INTEGER NOT NULL, user_id INTEGER NOT NULL, address TEXT NOT NULL UNIQUE COLLATE NOCASE, domain TEXT NOT NULL, mode TEXT NOT NULL DEFAULT 'fixed', subdomain TEXT NOT NULL DEFAULT '', create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, expires_at TEXT NOT NULL, deleted_at TEXT)`,
 	`CREATE TABLE temp_message (temp_message_id INTEGER PRIMARY KEY AUTOINCREMENT, temp_inbox_id TEXT NOT NULL, send_email TEXT, name TEXT, subject TEXT, text TEXT, content TEXT, recipient TEXT NOT NULL DEFAULT '[]', cc TEXT NOT NULL DEFAULT '[]', message_id TEXT NOT NULL DEFAULT '', unread INTEGER NOT NULL DEFAULT 0, raw_source TEXT NOT NULL DEFAULT '', size INTEGER NOT NULL DEFAULT 0, starred INTEGER NOT NULL DEFAULT 0, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, is_deleted INTEGER NOT NULL DEFAULT 0)`,
 	`CREATE TABLE temp_attachment (temp_attachment_id INTEGER PRIMARY KEY AUTOINCREMENT, temp_message_id INTEGER NOT NULL, key TEXT NOT NULL, filename TEXT, mime_type TEXT, size INTEGER, disposition TEXT, content_id TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 	`CREATE TABLE temp_token (token_hash TEXT PRIMARY KEY, temp_inbox_id TEXT NOT NULL, expires_at TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
-	`CREATE TABLE api_key_usage (api_key_id INTEGER NOT NULL, usage_date TEXT NOT NULL, call_count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(api_key_id, usage_date))`
+	`CREATE TABLE api_key_usage (api_key_id INTEGER NOT NULL, usage_date TEXT NOT NULL, call_count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(api_key_id, usage_date))`,
+	`CREATE TABLE temporary_identity (rowkey TEXT PRIMARY KEY, full_name TEXT NOT NULL DEFAULT '', temporary_mail TEXT NOT NULL DEFAULT '', username TEXT NOT NULL DEFAULT '', gender TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', country TEXT NOT NULL DEFAULT '未分类', data TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+	`CREATE TABLE temporary_identity_country (country TEXT PRIMARY KEY, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
 ];
 
 beforeEach(async () => {

@@ -12,8 +12,8 @@
     </div>
 
     <el-table :data="keys" v-loading="loading" empty-text="No API keys">
-      <el-table-column prop="name" :label="$t('apiKeyName')" min-width="160" />
-      <el-table-column prop="prefix" label="Prefix" min-width="110" />
+      <el-table-column prop="name" :label="$t('apiKeyName')" width="140" />
+      <el-table-column prop="prefix" label="Prefix"  />
       <el-table-column :label="$t('apiScopes')" min-width="260">
         <template #default="{ row }"><el-tag v-for="scope in row.scopes" :key="scope" class="scope">{{ scopeLabel(scope) }}</el-tag></template>
       </el-table-column>

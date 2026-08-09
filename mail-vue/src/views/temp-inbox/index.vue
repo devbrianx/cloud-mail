@@ -281,15 +281,13 @@ loadInboxes();
 
 <style scoped lang="scss">
 .temporary-inboxes { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); height: 100%; overflow: hidden; }
-.mailbox-panel, .message-panel { min-width: 0; padding: 20px; border-right: 1px solid var(--el-border-color-lighter); }
-.mailbox-panel { display: flex; flex-direction: column; overflow: hidden; }
-.message-panel { overflow: auto; }
+.mailbox-panel, .message-panel { min-width: 0; padding: 20px; overflow: auto; border-right: 1px solid var(--el-border-color-lighter); }
 .message-panel { border-right: 0; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
 .panel-header h2 { margin: 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel-actions { display: flex; gap: 8px; }
 .select-all { margin-bottom: 10px; }
-.inbox-list { flex: 1; min-height: 0; }
+.inbox-list { max-height: calc(100% - 124px); }
 .inbox-card { display: flex; gap: 10px; align-items: flex-start; padding: 12px; margin-bottom: 10px; border: 1px solid var(--el-border-color-lighter); border-radius: 8px; cursor: pointer; }
 .inbox-card.selected { background: var(--choose-account-background); }
 .inbox-card-content { display: grid; gap: 6px; min-width: 0; color: var(--el-text-color-secondary); font-size: 13px; }
@@ -303,5 +301,5 @@ loadInboxes();
 :deep(.domain-select .el-select__wrapper) { box-shadow: none; }
 .prefix-refresh { color: var(--el-text-color-secondary); cursor: pointer; }
 .prefix-refresh:hover { color: var(--el-color-primary); }
-@media (max-width: 767px) { .temporary-inboxes { grid-template-columns: 1fr; overflow: auto; } .mailbox-panel, .message-panel { min-height: 280px; border-right: 0; border-bottom: 1px solid var(--el-border-color-lighter); } .mailbox-panel { overflow: hidden; } }
+@media (max-width: 767px) { .temporary-inboxes { grid-template-columns: 1fr; overflow: auto; } .mailbox-panel, .message-panel { min-height: 280px; border-right: 0; border-bottom: 1px solid var(--el-border-color-lighter); } }
 </style>
