@@ -34,6 +34,7 @@ const dbInit = {
 		await this.v3_2DB(c);
 		await this.v3_3DB(c);
 		await this.v3_4DB(c);
+		await this.v3_5DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -168,6 +169,17 @@ const dbInit = {
 		for (const [name, key, sort] of [['临时身份查看', 'temporary-identity:query', 0], ['临时身份添加', 'temporary-identity:add', 1], ['临时身份修改', 'temporary-identity:set', 2], ['临时身份删除', 'temporary-identity:delete', 3]]) {
 			await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT ?, ?, ?, 2, ? WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = ?)`).bind(name, key, parent.perm_id, sort, key).run();
 		}
+	},
+
+	async v3_5DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE temporary_identity ADD COLUMN country TEXT NOT NULL DEFAULT '未分类'`).run();
+		} catch (error) {
+			console.warn(`Skipping temporary identity country migration: ${error.message}`);
+		}
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS temporary_identity_country (country TEXT PRIMARY KEY, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();
+		await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS temporary_identity_country_updated_idx ON temporary_identity(country, update_time)`).run();
+		await c.env.db.prepare(`INSERT OR IGNORE INTO temporary_identity_country(country) SELECT DISTINCT country FROM temporary_identity WHERE trim(country) <> ''`).run();
 	},
 
 	async v2_9DB(c) {

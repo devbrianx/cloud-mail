@@ -9,6 +9,7 @@ const temporaryIdentity = sqliteTable('temporary_identity', {
 	gender: text('gender').notNull().default(''),
 	city: text('city').notNull().default(''),
 	address: text('address').notNull().default(''),
+	country: text('country').notNull().default('未分类'),
 	data: text('data').notNull(),
 	createTime: text('create_time').notNull().default(sql`CURRENT_TIMESTAMP`),
 	updateTime: text('update_time').notNull().default(sql`CURRENT_TIMESTAMP`)

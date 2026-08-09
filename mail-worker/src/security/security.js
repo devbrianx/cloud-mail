@@ -95,10 +95,10 @@ const premKey = {
 	'reg-key:query': ['/regKey/list','/regKey/history'],
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 	'api-key:query': ['/apiKey', '/tempInbox'],
-	'temporary-identity:query': ['/temporaryIdentity/list', '/temporaryIdentity/detail'],
-	'temporary-identity:add': ['/temporaryIdentity/add', '/temporaryIdentity/import'],
-	'temporary-identity:set': ['/temporaryIdentity/set'],
-	'temporary-identity:delete': ['/temporaryIdentity/delete']
+	'temporary-identity:query': ['/temporaryIdentity/countries', '/temporaryIdentity/list', '/temporaryIdentity/detail'],
+	'temporary-identity:add': ['/temporaryIdentity/country/add', '/temporaryIdentity/add'],
+	'temporary-identity:set': ['/temporaryIdentity/country/set', '/temporaryIdentity/set'],
+	'temporary-identity:delete': ['/temporaryIdentity/country/delete', '/temporaryIdentity/delete']
 };
 
 app.use('*', async (c, next) => {
