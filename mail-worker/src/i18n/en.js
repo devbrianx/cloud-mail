@@ -101,7 +101,12 @@ const en = {
 		"设置修改": "Change Settings",
 		"发件重置": "Reset Send Count",
 		"临时邮箱 API": "Temporary Inbox API",
-		"API 密钥": "API Keys"
+		"API 密钥": "API Keys",
+		"临时身份": "Temporary Identities",
+		"临时身份查看": "View Temporary Identities",
+		"临时身份添加": "Add Temporary Identities",
+		"临时身份修改": "Edit Temporary Identities",
+		"临时身份删除": "Delete Temporary Identities"
 	}
 };
 

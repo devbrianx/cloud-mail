@@ -372,9 +372,14 @@ const zh = {
     ,expiresAt: '到期时间'
     ,messageCount: '邮件数量'
     ,deleteTemporaryInboxesWarning: '删除选中的临时邮箱会永久删除其邮件、附件和临时令牌，是否继续？'
-    ,temporaryInboxesEmpty: '没有未过期的临时邮箱'
-    ,selectTemporaryInbox: '请选择临时邮箱'
-    ,selectTemporaryMessage: '请选择邮件'
-    ,back: '返回'
+    ,temporaryIdentities: '临时身份'
+    ,temporaryIdentity: '临时身份'
+    ,newTemporaryIdentity: '新建临时身份'
+    ,editTemporaryIdentity: '编辑临时身份'
+    ,importTemporaryIdentities: '导入临时身份'
+    ,deleteTemporaryIdentities: '删除临时身份'
+    ,searchTemporaryIdentities: '搜索姓名、邮箱、用户名、城市或地址'
+    ,temporaryIdentitiesEmpty: '暂无临时身份'
+    ,apiKeyLegacySecretUnavailable: '旧密钥无法复制，请创建替代密钥。'
 }
 export default zh

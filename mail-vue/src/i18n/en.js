@@ -372,10 +372,15 @@ const en = {
     ,expiresAt: 'Expires At'
     ,messageCount: 'Messages'
     ,deleteTemporaryInboxesWarning: 'Deleting the selected temporary inboxes permanently deletes their messages, attachments, and temporary tokens. Continue?'
-    ,temporaryInboxesEmpty: 'No active temporary inboxes'
-    ,selectTemporaryInbox: 'Select a temporary inbox'
-    ,selectTemporaryMessage: 'Select a message'
-    ,back: 'Back'
+    ,temporaryIdentities: 'Temporary Identities'
+    ,temporaryIdentity: 'Temporary Identity'
+    ,newTemporaryIdentity: 'New Temporary Identity'
+    ,editTemporaryIdentity: 'Edit Temporary Identity'
+    ,importTemporaryIdentities: 'Import Temporary Identities'
+    ,deleteTemporaryIdentities: 'Delete Temporary Identities'
+    ,searchTemporaryIdentities: 'Search name, email, username, city, or address'
+    ,temporaryIdentitiesEmpty: 'No temporary identities'
+    ,apiKeyLegacySecretUnavailable: 'Legacy keys cannot be copied; create a replacement key.'
 }
 
 export default en

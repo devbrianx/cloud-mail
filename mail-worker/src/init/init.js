@@ -33,6 +33,7 @@ const dbInit = {
 		await this.v3_1DB(c);
 		await this.v3_2DB(c);
 		await this.v3_3DB(c);
+		await this.v3_4DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -151,6 +152,21 @@ const dbInit = {
 			await c.env.db.prepare(`ALTER TABLE setting ADD COLUMN favicon TEXT NOT NULL DEFAULT ''`).run();
 		} catch (error) {
 			console.warn(`Skipping favicon migration statement: ${error.message}`);
+		}
+	},
+
+	async v3_4DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE api_key ADD COLUMN secret_ciphertext TEXT NOT NULL DEFAULT ''`).run();
+		} catch (error) {
+			console.warn(`Skipping API key ciphertext migration: ${error.message}`);
+		}
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS temporary_identity (rowkey TEXT PRIMARY KEY, full_name TEXT NOT NULL DEFAULT '', temporary_mail TEXT NOT NULL DEFAULT '', username TEXT NOT NULL DEFAULT '', gender TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', data TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();
+		await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS temporary_identity_updated_idx ON temporary_identity(update_time)`).run();
+		await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT '临时身份', NULL, 0, 1, 5.3 WHERE NOT EXISTS (SELECT 1 FROM perm WHERE name = '临时身份' AND perm_key IS NULL AND pid = 0)`).run();
+		const parent = await c.env.db.prepare(`SELECT perm_id FROM perm WHERE name = '临时身份' AND perm_key IS NULL AND pid = 0`).first();
+		for (const [name, key, sort] of [['临时身份查看', 'temporary-identity:query', 0], ['临时身份添加', 'temporary-identity:add', 1], ['临时身份修改', 'temporary-identity:set', 2], ['临时身份删除', 'temporary-identity:delete', 3]]) {
+			await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT ?, ?, ?, 2, ? WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = ?)`).bind(name, key, parent.perm_id, sort, key).run();
 		}
 	},
 

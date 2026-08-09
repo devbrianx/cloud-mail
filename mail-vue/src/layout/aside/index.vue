@@ -41,6 +41,11 @@
 		  <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
 		  <span class="menu-name" style="margin-left: 21px">{{$t('temporaryInboxes')}}</span>
 		</el-menu-item>
+        <el-menu-item @click="router.push({name: 'temporary-identity'})" index="temporary-identity" v-perm="'temporary-identity:query'"
+                      :class="route.meta.name === 'temporary-identity' ? 'choose-item' : ''">
+          <Icon icon="solar:user-id-outline" width="20" height="20" />
+          <span class="menu-name" style="margin-left: 21px">{{$t('temporaryIdentities')}}</span>
+        </el-menu-item>
         <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query']">
           <div>{{$t('manage')}}</div>
         </div>

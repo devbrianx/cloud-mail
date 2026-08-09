@@ -21,6 +21,33 @@ function base64url(bytes) {
 	return btoa(String.fromCharCode(...bytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
+function base64urlDecode(value) {
+	const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
+	return Uint8Array.from(atob(padded), char => char.charCodeAt(0));
+}
+
+async function encryptionKey(c) {
+	const keyMaterial = await crypto.subtle.digest('SHA-256', encoder.encode(c.env.jwt_secret));
+	return crypto.subtle.importKey('raw', keyMaterial, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+
+async function encryptSecret(c, secret) {
+	const iv = crypto.getRandomValues(new Uint8Array(12));
+	const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await encryptionKey(c), encoder.encode(secret));
+	return `${base64url(iv)}.${base64url(new Uint8Array(ciphertext))}`;
+}
+
+async function decryptSecret(c, value) {
+	try {
+		const [encodedIv, encodedCiphertext] = typeof value === 'string' ? value.split('.') : [];
+		if (!encodedIv || !encodedCiphertext) return null;
+		const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64urlDecode(encodedIv) }, await encryptionKey(c), base64urlDecode(encodedCiphertext));
+		return new TextDecoder().decode(plaintext);
+	} catch {
+		return null;
+	}
+}
+
 const apiKeyService = {
 	async requireEnabled(c) {
 		const setting = await settingService.query(c);
@@ -38,7 +65,7 @@ const apiKeyService = {
 		const bytes = new Uint8Array(32);
 		crypto.getRandomValues(bytes);
 		const secret = `AC-${base64url(bytes)}`;
-		const row = await orm(c).insert(apiKey).values({ userId, name: normalizedName, secretHash: await sha256(secret), secretPrefix: secret.slice(0, 8), scopes: JSON.stringify(scopes) }).returning().get();
+		const row = await orm(c).insert(apiKey).values({ userId, name: normalizedName, secretHash: await sha256(secret), secretPrefix: secret.slice(0, 8), secretCiphertext: await encryptSecret(c, secret), scopes: JSON.stringify(scopes) }).returning().get();
 		return { apiKeyId: row.apiKeyId, name: row.name, prefix: row.secretPrefix, scopes, secret, createTime: row.createTime };
 	},
 
@@ -46,14 +73,15 @@ const apiKeyService = {
 		await this.requireEnabled(c);
 		const rows = await orm(c).select().from(apiKey).where(eq(apiKey.userId, userId)).all();
 		const usage = await apiUsageService.usageByKey(c, rows.map(row => row.apiKeyId));
-		return rows.map(row => ({
+		return await Promise.all(rows.map(async row => ({
 			apiKeyId: row.apiKeyId,
 			name: row.name,
 			prefix: row.secretPrefix,
+			secret: await decryptSecret(c, row.secretCiphertext),
 			scopes: JSON.parse(row.scopes),
 			createTime: row.createTime,
 			...(usage.get(row.apiKeyId) || { todayCalls: 0, last30DaysCalls: 0 })
-		}));
+		})));
 	},
 
 	async delete(c, userId, apiKeyId) {

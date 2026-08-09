@@ -7,6 +7,7 @@ const apiKey = sqliteTable('api_key', {
 	name: text('name').notNull(),
 	secretHash: text('secret_hash').notNull(),
 	secretPrefix: text('secret_prefix').notNull(),
+	secretCiphertext: text('secret_ciphertext').notNull().default(''),
 	scopes: text('scopes').notNull(),
 	createTime: text('create_time').default(sql`CURRENT_TIMESTAMP`).notNull()
 });

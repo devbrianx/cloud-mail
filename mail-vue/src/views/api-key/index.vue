@@ -20,7 +20,7 @@
       <el-table-column prop="createTime" :label="$t('date')" min-width="180" />
       <el-table-column prop="todayCalls" :label="$t('apiKeyTodayCalls')" width="110" />
       <el-table-column prop="last30DaysCalls" :label="$t('apiKeyLast30DaysCalls')" width="130" />
-      <el-table-column :label="$t('action')" width="92"><template #default="{ row }"><div class="table-actions"><el-tooltip :content="$t('copy')" placement="top"><el-button link @click="copyKeyPrefix(row)"><Icon icon="fluent:copy-20-regular" width="18" height="18" /></el-button></el-tooltip><el-tooltip :content="$t('deleteApiKey')" placement="top"><el-button type="danger" link @click="deleteKey(row)"><Icon icon="uiw:delete" width="16" height="18" /></el-button></el-tooltip></div></template></el-table-column>
+      <el-table-column :label="$t('action')" width="92"><template #default="{ row }"><div class="table-actions"><el-tooltip :content="row.secret === null ? $t('apiKeyLegacySecretUnavailable') : $t('copy')" placement="top"><el-button link :disabled="row.secret === null" @click="copyKey(row)"><Icon icon="fluent:copy-20-regular" width="18" height="18" /></el-button></el-tooltip><el-tooltip :content="$t('deleteApiKey')" placement="top"><el-button type="danger" link @click="deleteKey(row)"><Icon icon="uiw:delete" width="16" height="18" /></el-button></el-tooltip></div></template></el-table-column>
     </el-table>
 
     <el-dialog v-model="createVisible" :title="$t('createApiKey')" width="420" @closed="resetCreate">
@@ -356,9 +356,9 @@ async function copyText(value) {
   ElMessage({ type: 'success', message: t('copySuccessMsg') });
 }
 
-async function copyKeyPrefix(row) {
+async function copyKey(row) {
   try {
-    await copyText(row.prefix);
+    await copyText(row.secret);
   } catch {
     ElMessage({ type: 'error', message: t('copyFailMsg') });
   }
