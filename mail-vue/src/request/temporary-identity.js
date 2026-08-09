@@ -28,8 +28,8 @@ export function temporaryIdentityAdd(country, data) {
   return http.post('/temporaryIdentity/add', { country, data });
 }
 
-export function temporaryIdentitySet(rowkey, country, data) {
-  return http.put(`/temporaryIdentity/set/${encodeURIComponent(rowkey)}`, { country, data });
+export function temporaryIdentitySet(rowkey, data) {
+  return http.put(`/temporaryIdentity/set/${encodeURIComponent(rowkey)}`, { data });
 }
 
 export function temporaryIdentityDelete(rowkeys) {

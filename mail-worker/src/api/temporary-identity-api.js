@@ -20,7 +20,7 @@ app.post('/temporaryIdentity/add', async c => {
 });
 app.put('/temporaryIdentity/set/:rowkey', async c => {
 	const body = await c.req.json();
-	return c.json(result.ok(await temporaryIdentityService.set(c, c.req.param('rowkey'), body.country, body.data)));
+	return c.json(result.ok(await temporaryIdentityService.set(c, c.req.param('rowkey'), body.data)));
 });
 app.delete('/temporaryIdentity/delete', async c => {
 	const body = await c.req.json();

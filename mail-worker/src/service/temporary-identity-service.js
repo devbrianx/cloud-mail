@@ -133,13 +133,12 @@ const temporaryIdentityService = {
 		return { rowkey: row.rowkey, country };
 	},
 
-	async set(c, rowkey, countryValue, input) {
-		const country = await requireCountry(c, countryValue);
-		const existing = await orm(c).select({ rowkey: temporaryIdentity.rowkey }).from(temporaryIdentity).where(eq(temporaryIdentity.rowkey, rowkey)).get();
+	async set(c, rowkey, input) {
+		const existing = await orm(c).select({ rowkey: temporaryIdentity.rowkey, country: temporaryIdentity.country }).from(temporaryIdentity).where(eq(temporaryIdentity.rowkey, rowkey)).get();
 		if (!existing) throw new BizError('Temporary identity not found', 404);
-		const row = normalizeRecord(input, rowkey, country);
+		const row = normalizeRecord(input, existing.rowkey, existing.country);
 		await orm(c).update(temporaryIdentity).set({ ...row, updateTime: new Date().toISOString() }).where(eq(temporaryIdentity.rowkey, rowkey)).run();
-		return { rowkey, country };
+		return { rowkey, country: existing.country };
 	},
 
 	async delete(c, rowkeys) {

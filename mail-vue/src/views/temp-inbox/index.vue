@@ -12,7 +12,7 @@
       <div v-if="inboxes.length" class="select-all">
         <el-checkbox :model-value="allSelected" :indeterminate="someSelected" @update:model-value="toggleAll">{{ $t('select') }}</el-checkbox>
       </div>
-      <el-scrollbar v-loading="loadingInboxes" class="inbox-list">
+      <el-scrollbar v-if="loadingInboxes || inboxes.length" v-loading="loadingInboxes" class="inbox-list">
         <article v-for="inbox in inboxes" :key="inbox.id" class="inbox-card" :class="{ selected: selectedInbox?.id === inbox.id }" @click="selectInbox(inbox)">
           <el-checkbox :model-value="selectedInboxIds.includes(inbox.id)" @click.stop @update:model-value="toggleInbox(inbox.id, $event)" />
           <div class="inbox-card-content">
@@ -22,8 +22,8 @@
           </div>
         </article>
       </el-scrollbar>
-      <el-pagination v-if="total > pageSize" background layout="prev, pager, next" :page-size="pageSize" :total="total" :current-page="page + 1" @current-change="changePage" />
       <el-empty v-if="!loadingInboxes && !inboxes.length" :description="$t('temporaryInboxesEmpty')" />
+      <el-pagination v-if="total > pageSize" background layout="prev, pager, next" :page-size="pageSize" :total="total" :current-page="page + 1" @current-change="changePage" />
     </section>
 
     <section v-if="selectedInbox" class="message-panel" v-loading="loadingMessage">
@@ -281,13 +281,15 @@ loadInboxes();
 
 <style scoped lang="scss">
 .temporary-inboxes { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); height: 100%; overflow: hidden; }
-.mailbox-panel, .message-panel { min-width: 0; padding: 20px; overflow: auto; border-right: 1px solid var(--el-border-color-lighter); }
+.mailbox-panel, .message-panel { min-width: 0; padding: 20px; border-right: 1px solid var(--el-border-color-lighter); }
+.mailbox-panel { display: flex; flex-direction: column; overflow: hidden; }
+.message-panel { overflow: auto; }
 .message-panel { border-right: 0; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
 .panel-header h2 { margin: 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel-actions { display: flex; gap: 8px; }
 .select-all { margin-bottom: 10px; }
-.inbox-list { max-height: calc(100% - 124px); }
+.inbox-list { flex: 1; min-height: 0; }
 .inbox-card { display: flex; gap: 10px; align-items: flex-start; padding: 12px; margin-bottom: 10px; border: 1px solid var(--el-border-color-lighter); border-radius: 8px; cursor: pointer; }
 .inbox-card.selected { background: var(--choose-account-background); }
 .inbox-card-content { display: grid; gap: 6px; min-width: 0; color: var(--el-text-color-secondary); font-size: 13px; }
@@ -301,5 +303,5 @@ loadInboxes();
 :deep(.domain-select .el-select__wrapper) { box-shadow: none; }
 .prefix-refresh { color: var(--el-text-color-secondary); cursor: pointer; }
 .prefix-refresh:hover { color: var(--el-color-primary); }
-@media (max-width: 767px) { .temporary-inboxes { grid-template-columns: 1fr; overflow: auto; } .mailbox-panel, .message-panel { min-height: 280px; border-right: 0; border-bottom: 1px solid var(--el-border-color-lighter); } }
+@media (max-width: 767px) { .temporary-inboxes { grid-template-columns: 1fr; overflow: auto; } .mailbox-panel, .message-panel { min-height: 280px; border-right: 0; border-bottom: 1px solid var(--el-border-color-lighter); } .mailbox-panel { overflow: hidden; } }
 </style>

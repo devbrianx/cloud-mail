@@ -48,6 +48,10 @@ async function decryptSecret(c, value) {
 	}
 }
 
+function displayPrefix(secret, fallback) {
+	return secret ? `${secret.slice(0, 8)}***${secret.slice(-4)}` : fallback;
+}
+
 const apiKeyService = {
 	async requireEnabled(c) {
 		const setting = await settingService.query(c);
@@ -66,22 +70,25 @@ const apiKeyService = {
 		crypto.getRandomValues(bytes);
 		const secret = `AC-${base64url(bytes)}`;
 		const row = await orm(c).insert(apiKey).values({ userId, name: normalizedName, secretHash: await sha256(secret), secretPrefix: secret.slice(0, 8), secretCiphertext: await encryptSecret(c, secret), scopes: JSON.stringify(scopes) }).returning().get();
-		return { apiKeyId: row.apiKeyId, name: row.name, prefix: row.secretPrefix, scopes, secret, createTime: row.createTime };
+		return { apiKeyId: row.apiKeyId, name: row.name, prefix: displayPrefix(secret, row.secretPrefix), scopes, secret, createTime: row.createTime };
 	},
 
 	async list(c, userId) {
 		await this.requireEnabled(c);
 		const rows = await orm(c).select().from(apiKey).where(eq(apiKey.userId, userId)).all();
 		const usage = await apiUsageService.usageByKey(c, rows.map(row => row.apiKeyId));
-		return await Promise.all(rows.map(async row => ({
-			apiKeyId: row.apiKeyId,
-			name: row.name,
-			prefix: row.secretPrefix,
-			secret: await decryptSecret(c, row.secretCiphertext),
-			scopes: JSON.parse(row.scopes),
-			createTime: row.createTime,
-			...(usage.get(row.apiKeyId) || { todayCalls: 0, last30DaysCalls: 0 })
-		})));
+		return await Promise.all(rows.map(async row => {
+			const secret = await decryptSecret(c, row.secretCiphertext);
+			return {
+				apiKeyId: row.apiKeyId,
+				name: row.name,
+				prefix: displayPrefix(secret, row.secretPrefix),
+				secret,
+				scopes: JSON.parse(row.scopes),
+				createTime: row.createTime,
+				...(usage.get(row.apiKeyId) || { todayCalls: 0, last30DaysCalls: 0 })
+			};
+		}));
 	},
 
 	async delete(c, userId, apiKeyId) {
