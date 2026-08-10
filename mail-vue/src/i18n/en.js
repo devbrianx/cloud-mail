@@ -1,5 +1,6 @@
 const en = {
     inbox: 'Inbox',
+    junkEmail: 'Junk Email',
     drafts: 'Drafts',
     sent: 'Sent',
     starred: 'Starred',
@@ -387,9 +388,8 @@ const en = {
     ,outlookMailService: 'Mail Service'
     ,outlookAuthorize: 'OAuth Authorize'
     ,outlookImport: 'Bulk Import'
-    ,outlookClientId: 'Client ID'
-    ,outlookClientSecret: 'Client Secret'
-    ,outlookImportRows: 'One line: email----client_secret----refresh_token----client_id'
+    ,outlookImportRows: 'One line: email----password----client_id----refresh_token'
+    ,outlookGraphImportHint: 'Imports use Microsoft Graph. The address must be the mailbox for the refresh token. The supplied password is never stored.'
     ,outlookImportResult: 'Import Result'
     ,outlookGroup: 'Group'
     ,outlookTags: 'Tags'
@@ -411,6 +411,17 @@ const en = {
     ,outlookOauthSuccess: 'Outlook authorization succeeded'
     ,outlookOauthError: 'Outlook authorization failed'
     ,outlookSyncFailed: 'Outlook synchronization failed'
+    ,outlookAddTag: 'Add Tag'
+    ,outlookTagNamePlaceholder: 'Enter a tag name'
+    ,outlookSaveTag: 'Save Tag'
+    ,outlookCancelEdit: 'Cancel Edit'
+    ,outlookOauthPopupBlocked: 'Your browser blocked the authorization popup. Allow popups and try again.'
+    ,outlookBatchSetGroup: 'Set Group for Selected'
+    ,outlookBatchDelete: 'Delete Selected'
+    ,outlookSelectedCount: '{count} accounts selected'
+    ,outlookBatchDeleteConfirm: 'Delete the selected {count} accounts?'
+    ,outlookGroupOrder: 'Group Order'
+    ,outlookSearchAccount: 'Search mailbox account'
 }
 
 export default en

@@ -36,6 +36,9 @@ const dbInit = {
 		await this.v3_4DB(c);
 		await this.v3_5DB(c);
 		await this.v3_6DB(c);
+		await this.v3_7DB(c);
+		await this.v3_9DB(c);
+		await this.v3_10DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -186,7 +189,7 @@ const dbInit = {
 	async v3_6DB(c) {
 		for (const statement of [
 			`CREATE TABLE IF NOT EXISTS outlook_account (outlook_account_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, email TEXT NOT NULL COLLATE NOCASE, client_id TEXT NOT NULL, client_secret_ciphertext TEXT NOT NULL, refresh_token_ciphertext TEXT NOT NULL, group_id INTEGER, delta_link TEXT NOT NULL DEFAULT '', sync_status TEXT NOT NULL DEFAULT 'ready', sync_error TEXT NOT NULL DEFAULT '', last_sync_time TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, is_del INTEGER NOT NULL DEFAULT 0, UNIQUE(user_id, email))`,
-			`CREATE TABLE IF NOT EXISTS outlook_group (outlook_group_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL COLLATE NOCASE, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, name))`,
+			`CREATE TABLE IF NOT EXISTS outlook_group (outlook_group_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL COLLATE NOCASE, sort INTEGER NOT NULL DEFAULT 0, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, name))`,
 			`CREATE TABLE IF NOT EXISTS outlook_tag (outlook_tag_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL COLLATE NOCASE, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, name))`,
 			`CREATE TABLE IF NOT EXISTS outlook_account_tag (outlook_account_id INTEGER NOT NULL, outlook_tag_id INTEGER NOT NULL, PRIMARY KEY(outlook_account_id, outlook_tag_id))`,
 			`CREATE TABLE IF NOT EXISTS outlook_message (outlook_account_id INTEGER NOT NULL, graph_message_id TEXT NOT NULL, email_id INTEGER NOT NULL, PRIMARY KEY(outlook_account_id, graph_message_id))`
@@ -201,6 +204,35 @@ const dbInit = {
 		const parent = await c.env.db.prepare(`SELECT perm_id FROM perm WHERE name = 'Outlook 邮箱管理' AND perm_key IS NULL AND pid = 0`).first();
 		for (const [name, key, sort] of [['Outlook 账号查看', 'outlook-account:query', 0], ['Outlook 账号添加', 'outlook-account:add', 1], ['Outlook 账号修改', 'outlook-account:set', 2], ['Outlook 账号删除', 'outlook-account:delete', 3], ['Outlook 分组查看', 'outlook-group:query', 4], ['Outlook 分组添加', 'outlook-group:add', 5], ['Outlook 分组修改', 'outlook-group:set', 6], ['Outlook 分组删除', 'outlook-group:delete', 7], ['Outlook 标签查看', 'outlook-tag:query', 8], ['Outlook 标签添加', 'outlook-tag:add', 9], ['Outlook 标签修改', 'outlook-tag:set', 10], ['Outlook 标签删除', 'outlook-tag:delete', 11], ['Outlook 邮件同步', 'outlook-sync:run', 12]]) {
 			await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT ?, ?, ?, 2, ? WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = ?)`).bind(name, key, parent.perm_id, sort, key).run();
+		}
+	},
+
+	async v3_7DB(c) {
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS outlook_connection (outlook_connection_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, provider_email TEXT NOT NULL COLLATE NOCASE, provider_user_principal_name TEXT NOT NULL DEFAULT '', client_id TEXT NOT NULL, client_secret_ciphertext TEXT NOT NULL DEFAULT '', refresh_token_ciphertext TEXT NOT NULL, sync_status TEXT NOT NULL DEFAULT 'ready', sync_error TEXT NOT NULL DEFAULT '', last_sync_time TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, is_del INTEGER NOT NULL DEFAULT 0, UNIQUE(user_id, provider_email, client_id))`).run();
+		for (const statement of [
+			`ALTER TABLE outlook_account ADD COLUMN outlook_connection_id INTEGER`
+		]) {
+			try { await c.env.db.prepare(statement).run(); } catch (error) { console.warn(`Skipping Outlook connection migration statement: ${error.message}`); }
+		}
+		await c.env.db.prepare(`INSERT OR IGNORE INTO outlook_connection(user_id, provider_email, client_id, client_secret_ciphertext, refresh_token_ciphertext, sync_status, sync_error, last_sync_time, create_time, update_time, is_del) SELECT user_id, email, client_id, client_secret_ciphertext, refresh_token_ciphertext, sync_status, sync_error, last_sync_time, create_time, update_time, is_del FROM outlook_account WHERE outlook_connection_id IS NULL AND client_id <> '' AND refresh_token_ciphertext <> ''`).run();
+		await c.env.db.prepare(`UPDATE outlook_account SET outlook_connection_id = (SELECT outlook_connection_id FROM outlook_connection c WHERE c.user_id = outlook_account.user_id AND c.provider_email = outlook_account.email AND c.client_id = outlook_account.client_id) WHERE outlook_connection_id IS NULL`).run();
+		await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS outlook_connection_user_idx ON outlook_connection(user_id, is_del)`).run();
+		await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS outlook_account_connection_idx ON outlook_account(outlook_connection_id, is_del)`).run();
+	},
+
+
+	async v3_9DB(c) {
+		try { await c.env.db.prepare(`ALTER TABLE outlook_message ADD COLUMN folder TEXT NOT NULL DEFAULT 'inbox'`).run(); } catch (error) { console.warn(`Skipping Outlook folder migration statement: ${error.message}`); }
+		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS outlook_folder_state (outlook_connection_id INTEGER NOT NULL, folder TEXT NOT NULL, delta_link TEXT NOT NULL DEFAULT '', PRIMARY KEY(outlook_connection_id, folder))`).run();
+		await c.env.db.prepare(`INSERT OR IGNORE INTO outlook_folder_state(outlook_connection_id, folder, delta_link) SELECT outlook_connection_id, 'inbox', delta_link FROM outlook_account WHERE outlook_connection_id IS NOT NULL`).run();
+	},
+
+	async v3_10DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE outlook_group ADD COLUMN sort INTEGER NOT NULL DEFAULT 0`).run();
+			await c.env.db.prepare(`UPDATE outlook_group AS target SET sort = (SELECT COUNT(*) FROM outlook_group AS prior WHERE prior.user_id = target.user_id AND prior.name COLLATE NOCASE < target.name COLLATE NOCASE)`).run();
+		} catch (error) {
+			if (!/duplicate column name/i.test(error.message)) throw error;
 		}
 	},
 

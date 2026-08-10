@@ -1,5 +1,6 @@
 const zh = {
     inbox: '收件箱',
+    junkEmail: '垃圾邮件',
     drafts: '草稿箱',
     sent: '已发送',
     starred: '星标邮件',
@@ -387,9 +388,8 @@ const zh = {
     ,outlookMailService: '邮件服务'
     ,outlookAuthorize: 'OAuth 授权'
     ,outlookImport: '批量导入'
-    ,outlookClientId: 'Client ID'
-    ,outlookClientSecret: 'Client Secret'
-    ,outlookImportRows: '每行：邮箱----client_secret----refresh_token----client_id'
+    ,outlookImportRows: '每行：邮箱----密码----client_id----令牌'
+    ,outlookGraphImportHint: '导入将使用 Microsoft Graph；邮箱必须与 refresh token 对应的邮箱一致。输入的密码不会保存。'
     ,outlookImportResult: '导入结果'
     ,outlookGroup: '分组'
     ,outlookTags: '标签'
@@ -411,5 +411,16 @@ const zh = {
     ,outlookOauthSuccess: 'Outlook 授权成功'
     ,outlookOauthError: 'Outlook 授权失败'
     ,outlookSyncFailed: 'Outlook 同步失败'
+    ,outlookAddTag: '新增标签'
+    ,outlookTagNamePlaceholder: '输入标签名称'
+    ,outlookSaveTag: '保存标签'
+    ,outlookCancelEdit: '取消编辑'
+    ,outlookOauthPopupBlocked: '浏览器阻止了授权弹窗，请允许弹窗后重试'
+    ,outlookBatchSetGroup: '批量分组'
+    ,outlookBatchDelete: '批量删除'
+    ,outlookSelectedCount: '已选择 {count} 个账号'
+    ,outlookBatchDeleteConfirm: '确认删除选中的 {count} 个账号吗？'
+    ,outlookGroupOrder: '分组排序'
+    ,outlookSearchAccount: '搜索邮箱账号'
 }
 export default zh

@@ -23,17 +23,25 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 
+function mailboxSourcePredicate(userId, localAccountId, outlook, outlookFolder) {
+	const accountExists = sql`EXISTS (SELECT 1 FROM account inbox_account JOIN outlook_account outlook_account ON outlook_account.user_id = ${userId} AND outlook_account.email COLLATE NOCASE = inbox_account.email AND outlook_account.is_del = ${isDel.NORMAL} WHERE inbox_account.account_id = ${localAccountId} AND inbox_account.user_id = ${userId} AND inbox_account.is_del = ${isDel.NORMAL})`;
+	if (!outlook) return sql`NOT ${accountExists}`;
+	return sql`EXISTS (SELECT 1 FROM outlook_account outlook_account JOIN outlook_message outlook_message ON outlook_message.outlook_account_id = outlook_account.outlook_account_id WHERE outlook_account.user_id = ${userId} AND outlook_account.is_del = ${isDel.NORMAL} AND outlook_account.email COLLATE NOCASE = (SELECT inbox_account.email FROM account inbox_account WHERE inbox_account.account_id = ${localAccountId} AND inbox_account.user_id = ${userId} AND inbox_account.is_del = ${isDel.NORMAL}) AND outlook_message.email_id = ${email.emailId} AND outlook_message.folder = ${outlookFolder})`;
+}
+
 const emailService = {
 
 	async list(c, params, userId) {
 
-		let { emailId, type, accountId, size, timeSort, allReceive } = params;
+		let { emailId, type, accountId, size, timeSort, allReceive, outlook, outlookFolder } = params;
 
 		size = Number(size);
 		emailId = Number(emailId);
 		timeSort = Number(timeSort);
 		accountId = Number(accountId);
 		allReceive = Number(allReceive);
+		outlook = String(outlook) === '1';
+		outlookFolder = String(outlookFolder).toLowerCase() === 'junkemail' ? 'junkemail' : 'inbox';
 
 		if (size > 50) {
 			size = 50;
@@ -77,7 +85,8 @@ const emailService = {
 					timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId),
 					eq(email.type, type),
 					eq(email.isDel, isDel.NORMAL),
-					eq(account.isDel, isDel.NORMAL)
+					eq(account.isDel, isDel.NORMAL),
+					mailboxSourcePredicate(userId, account.accountId, outlook, outlookFolder),
 				)
 			);
 
@@ -100,7 +109,8 @@ const emailService = {
 					eq(email.userId, userId),
 					eq(email.type, type),
 					eq(email.isDel, isDel.NORMAL),
-					eq(account.isDel, isDel.NORMAL)
+					eq(account.isDel, isDel.NORMAL),
+					mailboxSourcePredicate(userId, account.accountId, outlook, outlookFolder),
 				)
 		).get();
 
@@ -109,7 +119,8 @@ const emailService = {
 				allReceive ? eq(1,1) : eq(email.accountId, accountId),
 				eq(email.userId, userId),
 				eq(email.type, type),
-				eq(email.isDel, isDel.NORMAL)
+				eq(email.isDel, isDel.NORMAL),
+				mailboxSourcePredicate(userId, email.accountId, outlook, outlookFolder),
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
 
@@ -701,8 +712,8 @@ const emailService = {
 	},
 
 	async latest(c, params, userId) {
-		let { emailId, accountId, allReceive } = params;
-		allReceive = Number(allReceive);
+		let { emailId, accountId, allReceive, outlook } = params;
+		outlook = String(outlook) === '1';
 
 		if (isNaN(allReceive)) {
 			let accountRow = await accountService.selectById(c, accountId);
@@ -721,7 +732,8 @@ const emailService = {
 					eq(email.isDel, isDel.NORMAL),
 					eq(account.isDel, isDel.NORMAL),
 					allReceive ? eq(1,1) : eq(email.accountId, accountId),
-					eq(email.type, emailConst.type.RECEIVE)
+					eq(email.type, emailConst.type.RECEIVE),
+					mailboxSourcePredicate(userId, account.accountId, outlook),
 				))
 			.orderBy(desc(email.emailId))
 			.limit(20);

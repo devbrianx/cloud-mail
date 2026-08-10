@@ -32,6 +32,8 @@ jobs:
       LINUXDO_CLIENT_SECRET: ${{ secrets.LINUXDO_CLIENT_SECRET || vars.LINUXDO_CLIENT_SECRET }}
       LINUXDO_CALLBACK_URL: ${{ secrets.LINUXDO_CALLBACK_URL || vars.LINUXDO_CALLBACK_URL }}
       LINUXDO_SWITCH: ${{ secrets.LINUXDO_SWITCH || vars.LINUXDO_SWITCH }}
+      OUTLOOK_CLIENT_ID: ${{ secrets.OUTLOOK_CLIENT_ID || vars.OUTLOOK_CLIENT_ID }}
+      OUTLOOK_CLIENT_SECRET: ${{ secrets.OUTLOOK_CLIENT_SECRET || vars.OUTLOOK_CLIENT_SECRET }}
 
 
     outputs:
@@ -95,6 +97,11 @@ jobs:
           
           if [ -z "$CUSTOM_DOMAIN" ]; then
             echo "::warning:: CUSTOM_DOMAIN variable is not set."
+          fi
+
+          if { [ -z "$OUTLOOK_CLIENT_ID" ] && [ -n "$OUTLOOK_CLIENT_SECRET" ]; } || { [ -n "$OUTLOOK_CLIENT_ID" ] && [ -z "$OUTLOOK_CLIENT_SECRET" ]; }; then
+            echo "❌ OUTLOOK_CLIENT_ID and OUTLOOK_CLIENT_SECRET must be configured together."
+            exit 1
           fi
           
           CONFIG_FILE="wrangler-action.toml"
@@ -229,6 +236,11 @@ jobs:
           DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
           if [ $DEPLOY_EXIT_CODE -ne 0 ]; then
             exit 1
+          fi
+
+          if [ -n "$OUTLOOK_CLIENT_ID" ]; then
+            printf '%s' "$OUTLOOK_CLIENT_ID" | pnpm wrangler secret put outlook_client_id -c wrangler-action.toml
+            printf '%s' "$OUTLOOK_CLIENT_SECRET" | pnpm wrangler secret put outlook_client_secret -c wrangler-action.toml
           fi
           
           WORKER_URL=$(grep -o "https://.*\.workers\.dev" deploy.log || echo "")

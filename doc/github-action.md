@@ -18,6 +18,14 @@
 | `ADMIN`                 |  ✅  | 您的管理员邮箱地址（例如 `admin@example.com`）      |
 | `JWT_SECRET`            |  ✅  | 用于生成和验证 JWT 的随机长字符串                     |
 | `INIT_URL`              |  ❌  | （可选）部署后用于初始化数据库的 Worker URL（格式参考下述手动初始化）           |
+| `OUTLOOK_CLIENT_ID`     |  ❌  | Microsoft Entra 应用注册的 Client ID，与 `OUTLOOK_CLIENT_SECRET` 同时配置以启用一键 Outlook OAuth 授权 |
+| `OUTLOOK_CLIENT_SECRET` |  ❌  | Microsoft Entra 应用注册的 Client Secret，部署时写入 Worker Secret，不会暴露给浏览器 |
+
+**Outlook 一键授权配置**
+
+在 Microsoft Entra 中注册 Web 应用，添加重定向 URI：`https://<CUSTOM_DOMAIN>/api/oauth/outlook/callback`；未配置自定义域名时，使用部署产生的 `https://<worker>.workers.dev/api/oauth/outlook/callback`。为该应用配置 Microsoft Graph 委托权限 `User.Read` 与 `Mail.Read`；运行时会请求 `offline_access` 以获得刷新令牌。`OUTLOOK_CLIENT_ID` 和 `OUTLOOK_CLIENT_SECRET` 必须同时设置。
+
+批量导入的 Graph `refresh_token` 对应的应用注册及用户授权必须包含 `Mail.Read`。`https://graph.microsoft.com/.default` 只会请求该 `client_id` 已配置并已同意的权限，不会自动添加 `Mail.Read`。批量导入不调用 `GET /me`，因此不要求 `User.Read`；填写的邮箱必须就是该 `refresh_token` 对应的邮箱，首次同步会使用 `Mail.Read` 访问该邮箱。
 
 ---
 

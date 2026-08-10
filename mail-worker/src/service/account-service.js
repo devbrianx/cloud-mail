@@ -127,14 +127,16 @@ const accountService = {
 			and(
 				eq(account.userId, userId),
 				eq(account.isDel, isDel.NORMAL),
-					or(
-						lt(account.sort, lastSort),
-						and(
-							eq(account.sort, lastSort),
-							gt(account.accountId, accountId)
-						)
-					))
+				sql`NOT EXISTS (SELECT 1 FROM outlook_account WHERE outlook_account.user_id = ${userId} AND outlook_account.email COLLATE NOCASE = ${account.email} AND outlook_account.is_del = ${isDel.NORMAL})`,
+				or(
+					lt(account.sort, lastSort),
+					and(
+						eq(account.sort, lastSort),
+						gt(account.accountId, accountId)
+					)
 				)
+			)
+		)
 			.orderBy(desc(account.sort), asc(account.accountId))
 			.limit(size)
 			.all();

@@ -105,17 +105,17 @@ const premKey = {
 	'temporary-identity:delete': ['/temporaryIdentity/country/delete', '/temporaryIdentity/delete']
 	,'outlook-account:query': ['/outlookAccount/list']
 	,'outlook-account:add': ['/outlookAccount/oauth/start', '/outlookAccount/import']
-	,'outlook-account:set': ['/outlookAccount/set']
-	,'outlook-account:delete': ['/outlookAccount/delete']
+	,'outlook-account:set': ['/outlookAccount/set', '/outlookAccount/batchSetGroup']
+	,'outlook-account:delete': ['/outlookAccount/delete', '/outlookAccount/batchDelete']
 	,'outlook-group:query': ['/outlookGroup/list']
 	,'outlook-group:add': ['/outlookGroup/add']
-	,'outlook-group:set': ['/outlookGroup/set']
+	,'outlook-group:set': ['/outlookGroup/set', '/outlookGroup/memberIds']
 	,'outlook-group:delete': ['/outlookGroup/delete']
 	,'outlook-tag:query': ['/outlookTag/list']
 	,'outlook-tag:add': ['/outlookTag/add']
 	,'outlook-tag:set': ['/outlookTag/set']
 	,'outlook-tag:delete': ['/outlookTag/delete']
-	,'outlook-sync:run': ['/outlookSync/run', '/outlookSync/status']
+	,'outlook-sync:run': ['/outlookSync/run', '/outlookSync/status', '/outlookAccount/list', '/outlookGroup/list']
 };
 
 app.use('*', async (c, next) => {

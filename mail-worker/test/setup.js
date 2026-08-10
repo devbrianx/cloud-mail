@@ -2,11 +2,12 @@ import { beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
 
 const schema = [
+	`DROP TABLE IF EXISTS outlook_folder_state`,
 	`DROP TABLE IF EXISTS outlook_message`,
 	`DROP TABLE IF EXISTS outlook_account_tag`,
 	`DROP TABLE IF EXISTS outlook_tag`,
 	`DROP TABLE IF EXISTS outlook_group`,
-	`DROP TABLE IF EXISTS outlook_account`,
+	`DROP TABLE IF EXISTS outlook_connection`,
 	`DROP TABLE IF EXISTS email`,
 	`DROP TABLE IF EXISTS role_perm`,
 	`DROP TABLE IF EXISTS perm`,
@@ -41,10 +42,11 @@ const schema = [
 	`CREATE TABLE temporary_identity_country (country TEXT PRIMARY KEY, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`
 	,`CREATE TABLE email (email_id INTEGER PRIMARY KEY AUTOINCREMENT, send_email TEXT, name TEXT, account_id INTEGER NOT NULL, user_id INTEGER NOT NULL, subject TEXT, code TEXT NOT NULL DEFAULT '', text TEXT, content TEXT, cc TEXT NOT NULL DEFAULT '[]', bcc TEXT NOT NULL DEFAULT '[]', recipient TEXT, to_email TEXT NOT NULL DEFAULT '', to_name TEXT NOT NULL DEFAULT '', in_reply_to TEXT NOT NULL DEFAULT '', relation TEXT NOT NULL DEFAULT '', message_id TEXT NOT NULL DEFAULT '', type INTEGER NOT NULL DEFAULT 0, status INTEGER NOT NULL DEFAULT 0, resend_email_id TEXT, message TEXT, unread INTEGER NOT NULL DEFAULT 0, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, is_del INTEGER NOT NULL DEFAULT 0)`
 	,`CREATE TABLE outlook_account (outlook_account_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, email TEXT NOT NULL COLLATE NOCASE, client_id TEXT NOT NULL, client_secret_ciphertext TEXT NOT NULL, refresh_token_ciphertext TEXT NOT NULL, group_id INTEGER, delta_link TEXT NOT NULL DEFAULT '', sync_status TEXT NOT NULL DEFAULT 'ready', sync_error TEXT NOT NULL DEFAULT '', last_sync_time TEXT, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, is_del INTEGER NOT NULL DEFAULT 0, UNIQUE(user_id, email))`
-	,`CREATE TABLE outlook_group (outlook_group_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL COLLATE NOCASE, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, name))`
+	,`CREATE TABLE outlook_group (outlook_group_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL COLLATE NOCASE, sort INTEGER NOT NULL DEFAULT 0, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, name))`
 	,`CREATE TABLE outlook_tag (outlook_tag_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, name TEXT NOT NULL COLLATE NOCASE, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, name))`
 	,`CREATE TABLE outlook_account_tag (outlook_account_id INTEGER NOT NULL, outlook_tag_id INTEGER NOT NULL, PRIMARY KEY(outlook_account_id, outlook_tag_id))`
 	,`CREATE TABLE outlook_message (outlook_account_id INTEGER NOT NULL, graph_message_id TEXT NOT NULL, email_id INTEGER NOT NULL, PRIMARY KEY(outlook_account_id, graph_message_id))`
+	,`CREATE TABLE outlook_folder_state (outlook_connection_id INTEGER NOT NULL, folder TEXT NOT NULL, delta_link TEXT NOT NULL DEFAULT '', PRIMARY KEY(outlook_connection_id, folder))`
 ];
 
 beforeEach(async () => {

@@ -133,6 +133,10 @@ const routers = {
 			meta: { title: 'temporaryInboxes', name: 'temp-inbox', menu: true }
 		},
 	],
+	'temporary-identity:query': [{
+		path: '/temporary-identities', name: 'temporary-identity', component: () => import('@/views/temporary-identity/index.vue'),
+		meta: { title: 'temporaryIdentities', name: 'temporary-identity', menu: true }
+	}],
 	'outlook-account:query': [{
 		path: '/outlook-accounts', name: 'outlook-accounts', component: () => import('@/views/outlook-accounts/index.vue'),
 		meta: { title: 'outlookAccountPool', name: 'outlook-accounts', menu: true }

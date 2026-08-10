@@ -12,6 +12,8 @@
   "vars": {
     "domain": ["example.com", "alt.example.com"],
     "admin": "admin@example.com",
-    "jwt_secret": "test-jwt-secret"
+    "jwt_secret": "test-jwt-secret",
+    "outlook_client_id": "test-outlook-client-id",
+    "outlook_client_secret": "test-outlook-client-secret"
   }
 }

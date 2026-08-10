@@ -295,7 +295,11 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  refreshBefore: Function
+  refreshBefore: Function,
+  refreshOnMount: {
+    type: Boolean,
+    default: false
+  }
 })
 
 const emit = defineEmits(['jump', 'refresh-before', 'delete-draft', 'right-search'])
@@ -375,7 +379,8 @@ onUnmounted(() => {
   clearInterval(timer)
 })
 
-getEmailList()
+if (props.refreshOnMount) refresh();
+else getEmailList();
 
 window.onresize = () => {
   isMobile.value = innerWidth < 1367
