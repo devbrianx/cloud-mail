@@ -42,6 +42,7 @@ const emailService = {
 		allReceive = Number(allReceive);
 		outlook = String(outlook) === '1';
 		outlookFolder = String(outlookFolder).toLowerCase() === 'junkemail' ? 'junkemail' : 'inbox';
+		const hasCursor = emailId > 0;
 
 		if (!emailId) emailId = timeSort ? 0 : 9999999999;
 		if (isNaN(allReceive)) {
@@ -52,7 +53,7 @@ const emailService = {
 		const commonConditions = cursor => and(
 			allReceive ? eq(1, 1) : eq(email.accountId, accountId),
 			eq(email.userId, userId),
-			...(cursor ? [timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId)] : []),
+			...(cursor && !outlook ? [timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId)] : []),
 			eq(email.type, type),
 			eq(email.isDel, isDel.NORMAL),
 			eq(account.isDel, isDel.NORMAL),
@@ -62,14 +63,33 @@ const emailService = {
 			? query.innerJoin(outlookMessage, and(eq(outlookMessage.emailId, email.emailId), eq(outlookMessage.folder, outlookFolder))).innerJoin(outlookAccount, and(eq(outlookAccount.outlookAccountId, outlookMessage.outlookAccountId), eq(outlookAccount.userId, userId), eq(outlookAccount.isDel, isDel.NORMAL), sql`${outlookAccount.email} COLLATE NOCASE = ${account.email}`))
 			: query;
 
+		let outlookCursor;
+		if (outlook && hasCursor) {
+			let cursorQuery = orm(c).select({ emailId: email.emailId, createTime: email.createTime }).from(email).leftJoin(account, eq(account.accountId, email.accountId));
+			outlookCursor = await outlookJoins(cursorQuery).where(and(commonConditions(false), eq(email.emailId, emailId))).get();
+		}
+
+		let listConditions = commonConditions(!outlook);
+		if (outlook && hasCursor) {
+			const cursorConditions = outlookCursor
+				? timeSort
+					? or(gt(email.createTime, outlookCursor.createTime), and(eq(email.createTime, outlookCursor.createTime), gt(email.emailId, outlookCursor.emailId)))
+					: or(lt(email.createTime, outlookCursor.createTime), and(eq(email.createTime, outlookCursor.createTime), lt(email.emailId, outlookCursor.emailId)))
+				: sql`0 = 1`;
+			listConditions = and(listConditions, cursorConditions);
+		}
+
+		const descendingOrder = outlook ? [desc(email.createTime), desc(email.emailId)] : [desc(email.emailId)];
+		const listOrder = outlook ? (timeSort ? [asc(email.createTime), asc(email.emailId)] : descendingOrder) : (timeSort ? [asc(email.emailId)] : descendingOrder);
+
 		let listQuery = orm(c).select({ ...email, starId: star.starId }).from(email).leftJoin(star, and(eq(star.emailId, email.emailId), eq(star.userId, userId))).leftJoin(account, eq(account.accountId, email.accountId));
-		listQuery = outlookJoins(listQuery).where(commonConditions(true)).orderBy(timeSort ? asc(email.emailId) : desc(email.emailId)).limit(size);
+		listQuery = outlookJoins(listQuery).where(listConditions).orderBy(...listOrder).limit(size);
 
 		let totalQuery = orm(c).select({ total: count() }).from(email).leftJoin(account, eq(account.accountId, email.accountId));
 		totalQuery = outlookJoins(totalQuery).where(commonConditions(false));
 
 		let latestEmailQuery = orm(c).select({ ...email }).from(email).leftJoin(account, eq(account.accountId, email.accountId));
-		latestEmailQuery = outlookJoins(latestEmailQuery).where(commonConditions(false)).orderBy(desc(email.emailId)).limit(1);
+		latestEmailQuery = outlookJoins(latestEmailQuery).where(commonConditions(false)).orderBy(...descendingOrder).limit(1);
 
 		let [list, totalRow, latestEmail] = await Promise.all([listQuery.all(), totalQuery.get(), latestEmailQuery.get()]);
 		list = list.map(item => ({ ...item, isStar: item.starId != null ? 1 : 0 }));

@@ -10,7 +10,6 @@
                :email-read="emailRead"
                :show-unread="true"
                actionLeft="4px"
-               :refresh-before="refreshBefore"
                @jump="jumpContent"
   >
     <template #first>
@@ -29,9 +28,6 @@ import {useEmailStore} from "@/store/email.js";
 import {useSettingStore} from "@/store/setting.js";
 import emailScroll from "@/components/email-scroll/index.vue"
 import {emailList, emailDelete, emailLatest, emailRead} from "@/request/email.js";
-import {outlookSyncRun} from '@/request/outlook-account.js';
-import {starAdd, starCancel} from "@/request/star.js";
-import {hasPerm} from '@/perm/perm.js';
 import {defineOptions, h, onMounted, reactive, ref, watch} from "vue";
 import {sleep} from "@/utils/time-utils.js";
 import router from "@/router/index.js";
@@ -151,16 +147,6 @@ function getEmailList(emailId, size) {
   })
 }
 
-async function refreshBefore() {
-  if (accountStore.currentAccount.allReceive || !hasPerm('outlook:query')) return false;
-  try {
-    await outlookSyncRun({accountId: accountStore.currentAccountId});
-    return true;
-  } catch (error) {
-    console.error('Outlook synchronization failed', error);
-    return false;
-  }
-}
 
 </script>
 <style>
