@@ -41,28 +41,28 @@
 		  <Icon icon="hugeicons:mailbox-01" width="20" height="20" />
 		  <span class="menu-name" style="margin-left: 21px">{{$t('temporaryInboxes')}}</span>
 		</el-menu-item>
-        <el-menu-item @click="router.push({name: 'temporary-identity'})" index="temporary-identity" v-perm="'temporary-identity:query'"
+        <el-menu-item @click="router.push({name: 'temporary-identity'})" index="temporary-identity"
                       :class="route.meta.name === 'temporary-identity' ? 'choose-item' : ''">
           <Icon icon="solar:user-id-outline" width="20" height="20" />
           <span class="menu-name" style="margin-left: 21px">{{$t('temporaryIdentities')}}</span>
         </el-menu-item>
-        <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query','outlook-account:query','outlook-group:query','outlook-sync:run']">
+        <div class="manage-title" v-perm="['all-email:query','user:query','role:query','setting:query','analysis:query','reg-key:query','outlook:query']">
           <div>{{$t('manage')}}</div>
         </div>
-        <el-sub-menu index="outlook-mailbox-management" v-perm="['outlook-account:query','outlook-group:query','outlook-sync:run']">
+        <el-sub-menu index="outlook-mailbox-management" v-perm="'outlook:query'">
           <template #title>
-            <Icon icon="hugeicons:mailbox-01" width="21" height="21" />
+            <Icon icon="hugeicons:mailbox-01" width="21" />
             <span class="menu-name" style="margin-left: 20px">{{$t('outlookMailboxManagement')}}</span>
           </template>
-          <el-menu-item class="outlook-submenu-item" v-perm="'outlook-account:query'" @click="router.push({name: 'outlook-accounts'})" index="outlook-accounts" :class="route.meta.name === 'outlook-accounts' ? 'choose-item' : ''">
-            <Icon icon="solar:users-group-rounded-outline" width="20" height="20" />
+          <el-menu-item class="outlook-submenu-item" v-perm="'outlook:query'" @click="router.push({name: 'outlook-accounts'})" index="outlook-accounts" :class="route.meta.name === 'outlook-accounts' ? 'choose-item' : ''">
+            <Icon icon="solar:users-group-rounded-outline" width="20" />
             <span class="menu-name" style="margin-left: 20px">{{$t('outlookAccountPool')}}</span>
           </el-menu-item>
-          <el-menu-item class="outlook-submenu-item" v-perm="'outlook-group:query'" @click="router.push({name: 'outlook-groups'})" index="outlook-groups" :class="route.meta.name === 'outlook-groups' ? 'choose-item' : ''">
-            <Icon icon="solar:folder-with-files-outline" width="20" height="20" />
+          <el-menu-item class="outlook-submenu-item" v-perm="'outlook:query'" @click="router.push({name: 'outlook-groups'})" index="outlook-groups" :class="route.meta.name === 'outlook-groups' ? 'choose-item' : ''">
+            <Icon icon="solar:folder-with-files-outline" width="20" />
             <span class="menu-name" style="margin-left: 20px">{{$t('outlookGroupManagement')}}</span>
           </el-menu-item>
-          <el-menu-item class="outlook-submenu-item" v-perm="'outlook-sync:run'" @click="router.push({name: 'outlook-service'})" index="outlook-service" :class="route.meta.name === 'outlook-service' ? 'choose-item' : ''">
+          <el-menu-item class="outlook-submenu-item" v-perm="'outlook:query'" @click="router.push({name: 'outlook-service'})" index="outlook-service" :class="route.meta.name === 'outlook-service' ? 'choose-item' : ''">
             <Icon icon="solar:refresh-circle-outline" width="20" height="20" />
             <span class="menu-name" style="margin-left: 20px">{{$t('outlookMailService')}}</span>
           </el-menu-item>

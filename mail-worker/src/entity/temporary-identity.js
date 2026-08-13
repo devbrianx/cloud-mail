@@ -1,8 +1,9 @@
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 const temporaryIdentity = sqliteTable('temporary_identity', {
 	rowkey: text('rowkey').primaryKey(),
+	userId: integer('user_id').notNull(),
 	fullName: text('full_name').notNull().default(''),
 	temporaryMail: text('temporary_mail').notNull().default(''),
 	username: text('username').notNull().default(''),

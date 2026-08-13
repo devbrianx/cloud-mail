@@ -3,22 +3,22 @@
     <div class="toolbar">
       <div><h2>{{ $t('outlookAccountPool') }}</h2></div>
       <div class="actions">
-        <el-button v-perm="'outlook-account:add'" type="primary" :loading="authorizing" @click="authorize">{{ $t('outlookAuthorize') }}</el-button>
-        <el-button v-perm="'outlook-account:add'" @click="importVisible = true">{{ $t('outlookImport') }}</el-button>
+        <el-button type="primary" :loading="authorizing" @click="authorize">{{ $t('outlookAuthorize') }}</el-button>
+        <el-button @click="importVisible = true">{{ $t('outlookImport') }}</el-button>
         <el-button @click="load"><Icon icon="ion:reload" /></el-button>
       </div>
     </div>
     <div v-if="selectedIds.length" class="batch-actions">
       <span>{{ $t('outlookSelectedCount', { count: selectedIds.length }) }}</span>
-      <el-button v-perm="'outlook-account:set'" size="small" @click="openBatchGroup">{{ $t('outlookBatchSetGroup') }}</el-button>
-      <el-button v-perm="'outlook-account:delete'" size="small" type="danger" @click="batchRemove">{{ $t('outlookBatchDelete') }}</el-button>
+      <el-button size="small" @click="openBatchGroup">{{ $t('outlookBatchSetGroup') }}</el-button>
+      <el-button size="small" type="danger" @click="batchRemove">{{ $t('outlookBatchDelete') }}</el-button>
     </div>
     <el-table :data="accounts" v-loading="loading" @selection-change="changeSelection">
       <el-table-column type="selection" width="48" />
       <el-table-column prop="email" :label="$t('emailAccount')" min-width="190" />
       <el-table-column prop="groupName" :label="$t('outlookGroup')" min-width="130" />
       <el-table-column :label="$t('outlookTags')" min-width="180"><template #default="{ row }"><el-tag v-for="tag in row.tagNames" :key="tag" class="tag">{{ tag }}</el-tag></template></el-table-column>
-      <el-table-column :label="$t('action')" width="150"><template #default="{ row }"><el-button v-perm="'outlook-account:set'" size="small" @click="openOrganization(row)">{{ $t('change') }}</el-button><el-button v-perm="'outlook-account:delete'" size="small" type="danger" @click="remove(row)">{{ $t('delete') }}</el-button></template></el-table-column>
+      <el-table-column :label="$t('action')" width="150"><template #default="{ row }"><el-button size="small" @click="openOrganization(row)">{{ $t('change') }}</el-button><el-button size="small" type="danger" @click="remove(row)">{{ $t('delete') }}</el-button></template></el-table-column>
     </el-table>
     <div v-if="total > pageSize" class="account-pagination"><el-pagination background layout="prev, pager, next" :page-size="pageSize" :total="total" :current-page="page + 1" @current-change="changePage" /></div>
 

@@ -342,16 +342,18 @@ function refresh() {
   accounts.splice(0, accounts.length)
   getAccountList()
 }
-async function changeAccount(account) {
-  if (hasPerm('outlook-sync:run')) {
-    try {
-      await outlookSyncRun({accountId: account.accountId})
-    } catch (error) {
-      ElMessage({message: t('outlookSyncFailed'), type: 'error', plain: true})
-    }
-  }
-  accountStore.currentAccountId = account.accountId
-  accountStore.currentAccount = account
+function syncAccount(accountId) {
+  outlookSyncRun({accountId}).then(() => {
+    if (accountStore.currentAccountId === accountId) emailStore.emailScroll?.refreshList();
+  }).catch(() => {
+    ElMessage({message: t('outlookSyncFailed'), type: 'error', plain: true});
+  });
+}
+
+function changeAccount(account) {
+  accountStore.currentAccountId = account.accountId;
+  accountStore.currentAccount = account;
+  if (hasPerm('outlook:query')) syncAccount(account.accountId);
 }
 
 function add() {

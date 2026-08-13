@@ -381,6 +381,7 @@ const en = {
     ,deleteTemporaryIdentities: 'Delete Temporary Identities'
     ,searchTemporaryIdentities: 'Search name, email, username, city, or address'
     ,temporaryIdentitiesEmpty: 'No temporary identities'
+    ,temporaryInboxesEmpty: 'No temporary inboxes'
     ,apiKeyLegacySecretUnavailable: 'Legacy keys cannot be copied; create a replacement key.'
     ,outlookMailboxManagement: 'Mailbox Management'
     ,outlookAccountPool: 'Account Pool'

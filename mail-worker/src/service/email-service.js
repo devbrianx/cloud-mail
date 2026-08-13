@@ -22,6 +22,8 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import outlookAccount from '../entity/outlook-account';
+import outlookMessage from '../entity/outlook-message';
 
 function mailboxSourcePredicate(userId, localAccountId, outlook, outlookFolder) {
 	const accountExists = sql`EXISTS (SELECT 1 FROM account inbox_account JOIN outlook_account outlook_account ON outlook_account.user_id = ${userId} AND outlook_account.email COLLATE NOCASE = inbox_account.email AND outlook_account.is_del = ${isDel.NORMAL} WHERE inbox_account.account_id = ${localAccountId} AND inbox_account.user_id = ${userId} AND inbox_account.is_del = ${isDel.NORMAL})`;
@@ -32,10 +34,8 @@ function mailboxSourcePredicate(userId, localAccountId, outlook, outlookFolder) 
 const emailService = {
 
 	async list(c, params, userId) {
-
 		let { emailId, type, accountId, size, timeSort, allReceive, outlook, outlookFolder } = params;
-
-		size = Number(size);
+		size = Math.min(Number(size), 50);
 		emailId = Number(emailId);
 		timeSort = Number(timeSort);
 		accountId = Number(accountId);
@@ -43,105 +43,38 @@ const emailService = {
 		outlook = String(outlook) === '1';
 		outlookFolder = String(outlookFolder).toLowerCase() === 'junkemail' ? 'junkemail' : 'inbox';
 
-		if (size > 50) {
-			size = 50;
-		}
-
-		if (!emailId) {
-
-			if (timeSort) {
-				emailId = 0;
-			} else {
-				emailId = 9999999999;
-			}
-
-		}
-
+		if (!emailId) emailId = timeSort ? 0 : 9999999999;
 		if (isNaN(allReceive)) {
-			let accountRow = await accountService.selectById(c, accountId);
+			const accountRow = await accountService.selectById(c, accountId);
 			allReceive = accountRow.allReceive;
 		}
 
-		const query = orm(c)
-			.select({
-				...email,
-				starId: star.starId
-			})
-			.from(email)
-			.leftJoin(
-				star,
-				and(
-					eq(star.emailId, email.emailId),
-					eq(star.userId, userId)
-				)
-			).leftJoin(
-				account,
-				eq(account.accountId, email.accountId)
-			)
-			.where(
-				and(
-					allReceive ? eq(1,1) : eq(email.accountId, accountId),
-					eq(email.userId, userId),
-					timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId),
-					eq(email.type, type),
-					eq(email.isDel, isDel.NORMAL),
-					eq(account.isDel, isDel.NORMAL),
-					mailboxSourcePredicate(userId, account.accountId, outlook, outlookFolder),
-				)
-			);
+		const commonConditions = cursor => and(
+			allReceive ? eq(1, 1) : eq(email.accountId, accountId),
+			eq(email.userId, userId),
+			...(cursor ? [timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId)] : []),
+			eq(email.type, type),
+			eq(email.isDel, isDel.NORMAL),
+			eq(account.isDel, isDel.NORMAL),
+			...(!outlook ? [mailboxSourcePredicate(userId, account.accountId, false, outlookFolder)] : [])
+		);
+		const outlookJoins = query => outlook
+			? query.innerJoin(outlookMessage, and(eq(outlookMessage.emailId, email.emailId), eq(outlookMessage.folder, outlookFolder))).innerJoin(outlookAccount, and(eq(outlookAccount.outlookAccountId, outlookMessage.outlookAccountId), eq(outlookAccount.userId, userId), eq(outlookAccount.isDel, isDel.NORMAL), sql`${outlookAccount.email} COLLATE NOCASE = ${account.email}`))
+			: query;
 
-		if (timeSort) {
-			query.orderBy(asc(email.emailId));
-		} else {
-			query.orderBy(desc(email.emailId));
-		}
+		let listQuery = orm(c).select({ ...email, starId: star.starId }).from(email).leftJoin(star, and(eq(star.emailId, email.emailId), eq(star.userId, userId))).leftJoin(account, eq(account.accountId, email.accountId));
+		listQuery = outlookJoins(listQuery).where(commonConditions(true)).orderBy(timeSort ? asc(email.emailId) : desc(email.emailId)).limit(size);
 
-		const listQuery = query.limit(size).all();
+		let totalQuery = orm(c).select({ total: count() }).from(email).leftJoin(account, eq(account.accountId, email.accountId));
+		totalQuery = outlookJoins(totalQuery).where(commonConditions(false));
 
-		const totalQuery = orm(c).select({ total: count() }).from(email)
-			.leftJoin(
-				account,
-				eq(account.accountId, email.accountId)
-			)
-			.where(
-				and(
-					allReceive ? eq(1,1) : eq(email.accountId, accountId),
-					eq(email.userId, userId),
-					eq(email.type, type),
-					eq(email.isDel, isDel.NORMAL),
-					eq(account.isDel, isDel.NORMAL),
-					mailboxSourcePredicate(userId, account.accountId, outlook, outlookFolder),
-				)
-		).get();
+		let latestEmailQuery = orm(c).select({ ...email }).from(email).leftJoin(account, eq(account.accountId, email.accountId));
+		latestEmailQuery = outlookJoins(latestEmailQuery).where(commonConditions(false)).orderBy(desc(email.emailId)).limit(1);
 
-		const latestEmailQuery = orm(c).select().from(email).where(
-			and(
-				allReceive ? eq(1,1) : eq(email.accountId, accountId),
-				eq(email.userId, userId),
-				eq(email.type, type),
-				eq(email.isDel, isDel.NORMAL),
-				mailboxSourcePredicate(userId, email.accountId, outlook, outlookFolder),
-			))
-			.orderBy(desc(email.emailId)).limit(1).get();
-
-		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
-
-		list = list.map(item => ({
-			...item,
-			isStar: item.starId != null ? 1 : 0
-		}));
-
-
+		let [list, totalRow, latestEmail] = await Promise.all([listQuery.all(), totalQuery.get(), latestEmailQuery.get()]);
+		list = list.map(item => ({ ...item, isStar: item.starId != null ? 1 : 0 }));
 		await this.emailAddAtt(c, list);
-
-		if (!latestEmail) {
-			latestEmail = {
-				emailId: 0,
-				accountId: accountId,
-				userId: userId,
-			}
-		}
-
+		if (!latestEmail) latestEmail = { emailId: 0, accountId, userId };
 		return { list, total: totalRow.total, latestEmail };
 	},
 

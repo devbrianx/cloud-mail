@@ -39,6 +39,8 @@ const dbInit = {
 		await this.v3_7DB(c);
 		await this.v3_9DB(c);
 		await this.v3_10DB(c);
+		await this.v3_11DB(c);
+		await this.v3_12DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -168,11 +170,6 @@ const dbInit = {
 		}
 		await c.env.db.prepare(`CREATE TABLE IF NOT EXISTS temporary_identity (rowkey TEXT PRIMARY KEY, full_name TEXT NOT NULL DEFAULT '', temporary_mail TEXT NOT NULL DEFAULT '', username TEXT NOT NULL DEFAULT '', gender TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', data TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();
 		await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS temporary_identity_updated_idx ON temporary_identity(update_time)`).run();
-		await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT '临时身份', NULL, 0, 1, 5.3 WHERE NOT EXISTS (SELECT 1 FROM perm WHERE name = '临时身份' AND perm_key IS NULL AND pid = 0)`).run();
-		const parent = await c.env.db.prepare(`SELECT perm_id FROM perm WHERE name = '临时身份' AND perm_key IS NULL AND pid = 0`).first();
-		for (const [name, key, sort] of [['临时身份查看', 'temporary-identity:query', 0], ['临时身份添加', 'temporary-identity:add', 1], ['临时身份修改', 'temporary-identity:set', 2], ['临时身份删除', 'temporary-identity:delete', 3]]) {
-			await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT ?, ?, ?, 2, ? WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = ?)`).bind(name, key, parent.perm_id, sort, key).run();
-		}
 	},
 
 	async v3_5DB(c) {
@@ -200,11 +197,7 @@ const dbInit = {
 			`CREATE INDEX IF NOT EXISTS outlook_account_tag_tag_idx ON outlook_account_tag(outlook_tag_id)`,
 			`CREATE INDEX IF NOT EXISTS outlook_message_email_idx ON outlook_message(email_id)`
 		]) await c.env.db.prepare(statement).run();
-		await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT 'Outlook 邮箱管理', NULL, 0, 1, 5.4 WHERE NOT EXISTS (SELECT 1 FROM perm WHERE name = 'Outlook 邮箱管理' AND perm_key IS NULL AND pid = 0)`).run();
-		const parent = await c.env.db.prepare(`SELECT perm_id FROM perm WHERE name = 'Outlook 邮箱管理' AND perm_key IS NULL AND pid = 0`).first();
-		for (const [name, key, sort] of [['Outlook 账号查看', 'outlook-account:query', 0], ['Outlook 账号添加', 'outlook-account:add', 1], ['Outlook 账号修改', 'outlook-account:set', 2], ['Outlook 账号删除', 'outlook-account:delete', 3], ['Outlook 分组查看', 'outlook-group:query', 4], ['Outlook 分组添加', 'outlook-group:add', 5], ['Outlook 分组修改', 'outlook-group:set', 6], ['Outlook 分组删除', 'outlook-group:delete', 7], ['Outlook 标签查看', 'outlook-tag:query', 8], ['Outlook 标签添加', 'outlook-tag:add', 9], ['Outlook 标签修改', 'outlook-tag:set', 10], ['Outlook 标签删除', 'outlook-tag:delete', 11], ['Outlook 邮件同步', 'outlook-sync:run', 12]]) {
-			await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT ?, ?, ?, 2, ? WHERE NOT EXISTS (SELECT 1 FROM perm WHERE perm_key = ?)`).bind(name, key, parent.perm_id, sort, key).run();
-		}
+		await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT 'Outlook 邮箱管理', 'outlook:query', 0, 2, 5.4 WHERE NOT EXISTS (SELECT 1 FROM perm WHERE name = 'Outlook 邮箱管理' AND pid = 0)`).run();
 	},
 
 	async v3_7DB(c) {
@@ -234,6 +227,67 @@ const dbInit = {
 		} catch (error) {
 			if (!/duplicate column name/i.test(error.message)) throw error;
 		}
+	},
+
+	async v3_11DB(c) {
+		for (const statement of [
+			`CREATE INDEX IF NOT EXISTS outlook_message_email_folder_idx ON outlook_message(email_id, folder)`,
+			`CREATE INDEX IF NOT EXISTS email_mailbox_list_idx ON email(user_id, account_id, type, is_del, email_id DESC)`
+		]) await c.env.db.prepare(statement).run();
+
+		await c.env.db.batch([
+			c.env.db.prepare(`DELETE FROM role_perm WHERE perm_id IN (SELECT perm_id FROM perm WHERE perm_key IN ('temporary-identity:query', 'temporary-identity:add', 'temporary-identity:set', 'temporary-identity:delete'))`),
+			c.env.db.prepare(`DELETE FROM perm WHERE perm_key IN ('temporary-identity:query', 'temporary-identity:add', 'temporary-identity:set', 'temporary-identity:delete')`),
+			c.env.db.prepare(`DELETE FROM perm WHERE name = '临时身份' AND perm_key IS NULL AND pid = 0 AND NOT EXISTS (SELECT 1 FROM perm child WHERE child.pid = perm.perm_id)`)
+		]);
+
+		const identityColumns = (await c.env.db.prepare(`PRAGMA table_info(temporary_identity)`).all()).results;
+		const countryColumns = (await c.env.db.prepare(`PRAGMA table_info(temporary_identity_country)`).all()).results;
+		const hasIdentityUserId = identityColumns.some(column => column.name === 'user_id');
+		const hasPrivateCountries = countryColumns.some(column => column.name === 'user_id' && column.pk) && countryColumns.some(column => column.name === 'country' && column.pk);
+		const needsOwner = !hasIdentityUserId || !hasPrivateCountries;
+		const identityCount = Number((await c.env.db.prepare(`SELECT COUNT(*) total FROM temporary_identity`).first()).total);
+		const countryCount = Number((await c.env.db.prepare(`SELECT COUNT(*) total FROM temporary_identity_country`).first()).total);
+		let adminUserId = null;
+		if (needsOwner && (identityCount || countryCount)) {
+			const admin = await c.env.db.prepare(`SELECT user_id FROM user WHERE email COLLATE NOCASE = ? AND is_del = 0`).bind(c.env.admin).first();
+			if (!admin) throw new Error('Temporary identity migration requires an active administrator user');
+			adminUserId = admin.user_id;
+		}
+
+		if (!hasIdentityUserId) await c.env.db.prepare(`ALTER TABLE temporary_identity ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0`).run();
+		if (adminUserId !== null) await c.env.db.prepare(`UPDATE temporary_identity SET user_id = ? WHERE user_id = 0`).bind(adminUserId).run();
+
+		if (!hasPrivateCountries) {
+			const statements = [
+				c.env.db.prepare(`DROP INDEX IF EXISTS temporary_identity_country_updated_idx`),
+				c.env.db.prepare(`CREATE TABLE temporary_identity_country_new (user_id INTEGER NOT NULL, country TEXT NOT NULL, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id, country))`)
+			];
+			if (adminUserId !== null) statements.push(c.env.db.prepare(`INSERT OR IGNORE INTO temporary_identity_country_new(user_id, country, create_time) SELECT ?, country, create_time FROM temporary_identity_country`).bind(adminUserId));
+			statements.push(
+				c.env.db.prepare(`INSERT OR IGNORE INTO temporary_identity_country_new(user_id, country, create_time) SELECT user_id, country, MIN(create_time) FROM temporary_identity WHERE trim(country) <> '' GROUP BY user_id, country`),
+				c.env.db.prepare(`DROP TABLE temporary_identity_country`),
+				c.env.db.prepare(`ALTER TABLE temporary_identity_country_new RENAME TO temporary_identity_country`)
+			);
+			await c.env.db.batch(statements);
+		}
+		await c.env.db.batch([
+			c.env.db.prepare(`DROP INDEX IF EXISTS temporary_identity_country_updated_idx`),
+			c.env.db.prepare(`CREATE INDEX IF NOT EXISTS temporary_identity_user_country_updated_idx ON temporary_identity(user_id, country, update_time)`)
+		]);
+	},
+
+	async v3_12DB(c) {
+		const legacyKeys = ['outlook-account:query', 'outlook-account:add', 'outlook-account:set', 'outlook-account:delete', 'outlook-group:query', 'outlook-group:add', 'outlook-group:set', 'outlook-group:delete', 'outlook-tag:query', 'outlook-tag:add', 'outlook-tag:set', 'outlook-tag:delete', 'outlook-sync:run'];
+		const placeholders = legacyKeys.map(() => '?').join(',');
+		await c.env.db.prepare(`INSERT INTO perm (name, perm_key, pid, type, sort) SELECT 'Outlook 邮箱管理', 'outlook:query', 0, 2, 5.4 WHERE NOT EXISTS (SELECT 1 FROM perm WHERE name = 'Outlook 邮箱管理' AND pid = 0)`).run();
+		await c.env.db.prepare(`UPDATE perm SET perm_key = 'outlook:query', type = 2, sort = 5.4 WHERE name = 'Outlook 邮箱管理' AND pid = 0`).run();
+		const outlookPerm = await c.env.db.prepare(`SELECT perm_id FROM perm WHERE name = 'Outlook 邮箱管理' AND pid = 0`).first();
+		await c.env.db.prepare(`INSERT INTO role_perm(role_id, perm_id) SELECT DISTINCT legacy.role_id, ? FROM role_perm legacy JOIN perm legacy_perm ON legacy_perm.perm_id = legacy.perm_id WHERE legacy_perm.perm_key IN (${placeholders}) AND NOT EXISTS (SELECT 1 FROM role_perm current WHERE current.role_id = legacy.role_id AND current.perm_id = ?)`).bind(outlookPerm.perm_id, ...legacyKeys, outlookPerm.perm_id).run();
+		await c.env.db.batch([
+			c.env.db.prepare(`DELETE FROM role_perm WHERE perm_id IN (SELECT perm_id FROM perm WHERE perm_key IN (${placeholders}))`).bind(...legacyKeys),
+			c.env.db.prepare(`DELETE FROM perm WHERE perm_key IN (${placeholders})`).bind(...legacyKeys)
+		]);
 	},
 
 	async v2_9DB(c) {

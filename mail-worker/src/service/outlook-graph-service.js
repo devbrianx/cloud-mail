@@ -41,8 +41,13 @@ const outlookGraphService = {
 		return new Uint8Array(await response.arrayBuffer());
 	},
 
-	initialDeltaUrl(folder = 'Inbox') {
-		return `${graphBaseUrl}/me/mailFolders/${encodeURIComponent(folder)}/messages/delta?$select=id,internetMessageId,subject,from,toRecipients,ccRecipients,receivedDateTime,body,hasAttachments,isRead&$top=50`;
+	initialDeltaUrl(folder = 'Inbox', receivedAfter) {
+		const query = new URLSearchParams({
+			'$select': 'id,internetMessageId,subject,from,toRecipients,ccRecipients,receivedDateTime,body,hasAttachments,isRead',
+			'$top': '50',
+			...(receivedAfter ? { '$filter': `receivedDateTime ge ${receivedAfter}` } : {})
+		});
+		return `${graphBaseUrl}/me/mailFolders/${encodeURIComponent(folder)}/messages/delta?${query}`;
 	},
 
 	attachmentUrl(messageId) {

@@ -814,66 +814,43 @@ function jumpDetails(email) {
 
 
 function getEmailList(refresh = false) {
-
-  if (reqLock) return;
+  if (reqLock) return Promise.resolve();
 
   let emailId = emailList.length > 0 ? emailList.at(-1).emailId : 0;
+  reqLock = true;
 
-  reqLock = true
-
-  if (!refresh) {
-
-    if (loading.value || noLoading.value) {
-      reqLock = false
-      return
-    }
-
-  } else {
-    getSkeletonRows()
-    emailId = 0
-    loading.value = true
-    scrollTop = 0
+  if (!refresh && (loading.value || noLoading.value)) {
+    reqLock = false;
+    return Promise.resolve();
   }
 
-  if (emailList.length === 0) {
-    loading.value = true
-  } else {
-    followLoading.value = !refresh;
+  if (refresh) {
+    getSkeletonRows();
+    emailId = 0;
+    loading.value = true;
+    scrollTop = 0;
   }
-  let start = Date.now();
 
-  props.getEmailList(emailId, queryParam.size).then(async data => {
-    let end = Date.now();
-    let duration = end - start;
-    if (duration < 300 && !emailId) {
-        await sleep(300 - duration)
-    }
-    firstLoad.value = false
+  if (emailList.length === 0) loading.value = true;
+  else followLoading.value = !refresh;
 
-    let list = data.list.map(item => ({
-      ...item,
-      checked: false
-    }));
+  return props.getEmailList(emailId, queryParam.size).then(data => {
+    firstLoad.value = false;
+    const list = data.list.map(item => ({ ...item, checked: false }));
 
-
-    if (refresh) {
-      emailList.length = 0
-    }
-
-    latestEmail.value = data.latestEmail
-
+    if (refresh) emailList.length = 0;
+    latestEmail.value = data.latestEmail;
     handleList(list);
     emailList.push(...list);
     if (refresh) scrollbarRef.value?.setScrollTop(0);
 
     noLoading.value = data.list.length < queryParam.size;
     followLoading.value = data.list.length >= queryParam.size;
-
     total.value = data.total;
   }).finally(() => {
-    loading.value = false
-    reqLock = false
-  })
+    loading.value = false;
+    reqLock = false;
+  });
 }
 
 function handleList(list) {
@@ -899,18 +876,16 @@ function handleList(list) {
   })
 }
 
-async function refresh() {
-  await props.refreshBefore?.()
-  if (props.skeleton) {
-    scrollbarRef.value.setScrollTop(0)
-  }
-  refreshList()
+function refresh() {
+  return Promise.resolve(props.refreshBefore?.()).catch(error => {
+    console.error('Email synchronization failed', error);
+  }).then(() => refreshList());
 }
 
 function refreshList() {
   checkAll.value = false;
   isIndeterminate.value = false;
-  getEmailList(true);
+  return getEmailList(true);
 }
 
 function loadData() {

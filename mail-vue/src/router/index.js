@@ -51,6 +51,16 @@ const routes = [
                     menu: true
                 }
             },
+            {
+                path: '/temporary-identities',
+                name: 'temporary-identity',
+                component: () => import('@/views/temporary-identity/index.vue'),
+                meta: {
+                    title: 'temporaryIdentities',
+                    name: 'temporary-identity',
+                    menu: true
+                }
+            },
         ]
 
     },

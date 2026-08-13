@@ -64,7 +64,6 @@ const requirePerms = [
 	'/regKey/history',
 	'/apiKey',
 	'/tempInbox',
-	'/temporaryIdentity',
 	'/outlookAccount',
 	'/outlookGroup',
 	'/outlookTag',
@@ -99,23 +98,7 @@ const premKey = {
 	'reg-key:query': ['/regKey/list','/regKey/history'],
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 	'api-key:query': ['/apiKey', '/tempInbox'],
-	'temporary-identity:query': ['/temporaryIdentity/countries', '/temporaryIdentity/list', '/temporaryIdentity/detail'],
-	'temporary-identity:add': ['/temporaryIdentity/country/add', '/temporaryIdentity/add'],
-	'temporary-identity:set': ['/temporaryIdentity/country/set', '/temporaryIdentity/set'],
-	'temporary-identity:delete': ['/temporaryIdentity/country/delete', '/temporaryIdentity/delete']
-	,'outlook-account:query': ['/outlookAccount/list']
-	,'outlook-account:add': ['/outlookAccount/oauth/start', '/outlookAccount/import']
-	,'outlook-account:set': ['/outlookAccount/set', '/outlookAccount/batchSetGroup']
-	,'outlook-account:delete': ['/outlookAccount/delete', '/outlookAccount/batchDelete']
-	,'outlook-group:query': ['/outlookGroup/list']
-	,'outlook-group:add': ['/outlookGroup/add']
-	,'outlook-group:set': ['/outlookGroup/set', '/outlookGroup/memberIds']
-	,'outlook-group:delete': ['/outlookGroup/delete']
-	,'outlook-tag:query': ['/outlookTag/list']
-	,'outlook-tag:add': ['/outlookTag/add']
-	,'outlook-tag:set': ['/outlookTag/set']
-	,'outlook-tag:delete': ['/outlookTag/delete']
-	,'outlook-sync:run': ['/outlookSync/run', '/outlookSync/status', '/outlookAccount/list', '/outlookGroup/list']
+	'outlook:query': ['/outlookAccount', '/outlookGroup', '/outlookTag', '/outlookSync']
 };
 
 app.use('*', async (c, next) => {

@@ -152,11 +152,13 @@ function getEmailList(emailId, size) {
 }
 
 async function refreshBefore() {
-  if (accountStore.currentAccount.allReceive || !hasPerm('outlook-sync:run')) return
+  if (accountStore.currentAccount.allReceive || !hasPerm('outlook:query')) return false;
   try {
-    await outlookSyncRun({accountId: accountStore.currentAccountId})
+    await outlookSyncRun({accountId: accountStore.currentAccountId});
+    return true;
   } catch (error) {
-    console.error('Outlook synchronization failed', error)
+    console.error('Outlook synchronization failed', error);
+    return false;
   }
 }
 

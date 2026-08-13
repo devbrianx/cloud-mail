@@ -373,6 +373,7 @@ const zh = {
     ,expiresAt: '到期时间'
     ,messageCount: '邮件数量'
     ,deleteTemporaryInboxesWarning: '删除选中的临时邮箱会永久删除其邮件、附件和临时令牌，是否继续？'
+    ,temporaryInboxesEmpty: '暂无临时邮箱'
     ,temporaryIdentities: '临时身份'
     ,temporaryIdentity: '临时身份'
     ,newTemporaryIdentity: '新建临时身份'

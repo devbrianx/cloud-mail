@@ -167,6 +167,9 @@ function searchAccounts() {
 
 function selectAccount(account) {
   if (account.accountId === null || reloading.value) return;
+  if (selectedAccount.value?.outlookAccountId !== account.outlookAccountId) {
+    params.timeSort = 0;
+  }
   selectedEmail.value = null;
   selectedAccount.value = account;
 }
@@ -204,14 +207,28 @@ function cancelStar(email) {
 }
 
 async function refreshBefore() {
-  const account = selectedAccount.value;
-  if (!account?.outlookAccountId) return;
-  refreshingAccountId.value = account.outlookAccountId;
+  const outlookAccountId = selectedAccount.value?.outlookAccountId;
+  if (!outlookAccountId) return false;
+  refreshingAccountId.value = outlookAccountId;
   try {
-    await outlookSyncRun({ outlookAccountId: account.outlookAccountId });
+    const result = await outlookSyncRun({ outlookAccountId });
+    if (selectedAccount.value?.outlookAccountId !== outlookAccountId) return false;
+
+    const listAccount = accounts.value.find(item => item.outlookAccountId === outlookAccountId);
+    if (listAccount) {
+      listAccount.syncStatus = 'ready';
+      listAccount.syncError = '';
+      if (result.lastSyncTime) listAccount.lastSyncTime = result.lastSyncTime;
+    }
+    selectedAccount.value.syncStatus = 'ready';
+    selectedAccount.value.syncError = '';
+    if (result.lastSyncTime) selectedAccount.value.lastSyncTime = result.lastSyncTime;
+    return true;
+  } catch (error) {
+    console.error('Outlook synchronization failed', error);
+    return false;
   } finally {
-    await loadAccounts(selectedGroupId.value, true);
-    refreshingAccountId.value = null;
+    if (refreshingAccountId.value === outlookAccountId) refreshingAccountId.value = null;
   }
 }
 

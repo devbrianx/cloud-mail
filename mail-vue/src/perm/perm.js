@@ -133,20 +133,18 @@ const routers = {
 			meta: { title: 'temporaryInboxes', name: 'temp-inbox', menu: true }
 		},
 	],
-	'temporary-identity:query': [{
-		path: '/temporary-identities', name: 'temporary-identity', component: () => import('@/views/temporary-identity/index.vue'),
-		meta: { title: 'temporaryIdentities', name: 'temporary-identity', menu: true }
-	}],
-	'outlook-account:query': [{
-		path: '/outlook-accounts', name: 'outlook-accounts', component: () => import('@/views/outlook-accounts/index.vue'),
-		meta: { title: 'outlookAccountPool', name: 'outlook-accounts', menu: true }
-	}],
-	'outlook-group:query': [{
-		path: '/outlook-groups', name: 'outlook-groups', component: () => import('@/views/outlook-groups/index.vue'),
-		meta: { title: 'outlookGroupManagement', name: 'outlook-groups', menu: true }
-	}],
-	'outlook-sync:run': [{
-		path: '/outlook-service', name: 'outlook-service', component: () => import('@/views/outlook-service/index.vue'),
-		meta: { title: 'outlookMailService', name: 'outlook-service', menu: true }
-	}]
+	'outlook:query': [
+		{
+			path: '/outlook-accounts', name: 'outlook-accounts', component: () => import('@/views/outlook-accounts/index.vue'),
+			meta: { title: 'outlookAccountPool', name: 'outlook-accounts', menu: true }
+		},
+		{
+			path: '/outlook-groups', name: 'outlook-groups', component: () => import('@/views/outlook-groups/index.vue'),
+			meta: { title: 'outlookGroupManagement', name: 'outlook-groups', menu: true }
+		},
+		{
+			path: '/outlook-service', name: 'outlook-service', component: () => import('@/views/outlook-service/index.vue'),
+			meta: { title: 'outlookMailService', name: 'outlook-service', menu: true }
+		}
+	]
 }

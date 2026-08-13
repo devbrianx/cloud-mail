@@ -10,6 +10,22 @@ const LOCK_TTL_SECONDS = 60;
 
 const GRAPH_FOLDERS = ['inbox', 'junkemail'];
 
+const INITIAL_SYNC_DAYS = 30;
+const ATTACHMENT_DOWNLOAD_CONCURRENCY = 3;
+
+async function mapConcurrent(values, limit, mapper) {
+	const results = new Array(values.length);
+	let nextIndex = 0;
+	const worker = async () => {
+		while (nextIndex < values.length) {
+			const index = nextIndex++;
+			results[index] = await mapper(values[index]);
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(limit, values.length) }, worker));
+	return results;
+}
+
 function recipientList(values = []) {
 	return values.filter(value => value?.emailAddress?.address).map(value => ({ address: value.emailAddress.address, name: value.emailAddress.name || '' }));
 }
@@ -53,35 +69,13 @@ const outlookSyncService = {
 			await c.env.db.prepare(`UPDATE outlook_connection SET sync_status = 'syncing', sync_error = '', update_time = CURRENT_TIMESTAMP WHERE outlook_connection_id = ?`).bind(connection.connection_id).run();
 			const accessToken = await outlookGraphService.refreshAccessToken(c, connection);
 			const accounts = (await c.env.db.prepare(`SELECT * FROM outlook_account WHERE outlook_connection_id = ? AND user_id = ? AND is_del = 0`).bind(connection.connection_id, userId).all()).results;
-			let received = 0;
-			let skipped = 0;
+			const localAccounts = (await c.env.db.prepare(`SELECT account_id, email, name FROM account WHERE user_id = ? AND is_del = 0`).bind(userId).all()).results;
+			const localAccountByEmail = new Map(localAccounts.map(account => [account.email.toLowerCase(), account]));
 			const states = (await c.env.db.prepare(`SELECT folder, delta_link FROM outlook_folder_state WHERE outlook_connection_id = ?`).bind(connection.connection_id).all()).results;
-			for (const folder of GRAPH_FOLDERS) {
-				let url = states.find(state => state.folder === folder)?.delta_link || outlookGraphService.initialDeltaUrl(folder === 'junkemail' ? 'JunkEmail' : 'Inbox');
-				let deltaLink = '';
-				while (url) {
-					const page = await outlookGraphService.get(accessToken, url);
-					for (const message of page.value || []) {
-						if (message['@removed'] || !message.id) { skipped++; continue; }
-						const destinations = accounts;
-						if (!destinations.length) { skipped++; continue; }
-						const unseen = [];
-						for (const account of destinations) {
-							const known = await c.env.db.prepare(`SELECT 1 FROM outlook_message WHERE outlook_account_id = ? AND graph_message_id = ?`).bind(account.outlook_account_id, message.id).first();
-							if (known) await c.env.db.prepare(`UPDATE outlook_message SET folder = ? WHERE outlook_account_id = ? AND graph_message_id = ?`).bind(folder, account.outlook_account_id, message.id).run();
-							else unseen.push(account);
-						}
-						if (!unseen.length) { skipped++; continue; }
-						const attachments = message.hasAttachments ? await this.loadAttachments(accessToken, message.id) : [];
-						for (const account of unseen) await this.persistMessage(c, account, accessToken, message, attachments, folder);
-						received += unseen.length;
-					}
-					url = page['@odata.nextLink'] || '';
-					deltaLink = page['@odata.deltaLink'] || deltaLink;
-				}
-				if (!deltaLink) throw new BizError('Microsoft Graph returned no delta cursor', 502);
-				await c.env.db.prepare(`INSERT INTO outlook_folder_state(outlook_connection_id, folder, delta_link) VALUES (?, ?, ?) ON CONFLICT(outlook_connection_id, folder) DO UPDATE SET delta_link = excluded.delta_link`).bind(connection.connection_id, folder, deltaLink).run();
-			}
+			const receivedAfter = new Date(Date.now() - INITIAL_SYNC_DAYS * 24 * 60 * 60 * 1000).toISOString();
+			const results = await Promise.all(GRAPH_FOLDERS.map(folder => this.syncFolder(c, connection, accounts, localAccountByEmail, accessToken, states, folder, receivedAfter)));
+			const received = results.reduce((total, result) => total + result.received, 0);
+			const skipped = results.reduce((total, result) => total + result.skipped, 0);
 			const lastSyncTime = new Date().toISOString();
 			await c.env.db.prepare(`UPDATE outlook_connection SET sync_status = 'ready', sync_error = '', last_sync_time = ?, update_time = CURRENT_TIMESTAMP WHERE outlook_connection_id = ?`).bind(lastSyncTime, connection.connection_id).run();
 			return { isOutlook: true, received, skipped, lastSyncTime };
@@ -94,8 +88,56 @@ const outlookSyncService = {
 		} finally { await c.env.kv.delete(lockKey); }
 	},
 
-	async persistMessage(c, providerAccount, accessToken, message, attachments, folder) {
-		const localAccount = await c.env.db.prepare(`SELECT * FROM account WHERE user_id = ? AND email COLLATE NOCASE = ? AND is_del = 0 ORDER BY account_id ASC LIMIT 1`).bind(providerAccount.user_id, providerAccount.email).first();
+	async syncFolder(c, connection, accounts, localAccountByEmail, accessToken, states, folder, receivedAfter) {
+		let url = states.find(state => state.folder === folder)?.delta_link || outlookGraphService.initialDeltaUrl(folder === 'junkemail' ? 'JunkEmail' : 'Inbox', receivedAfter);
+		let deltaLink = '';
+		let received = 0;
+		let skipped = 0;
+		while (url) {
+			const page = await outlookGraphService.get(accessToken, url);
+			const pageResult = await this.persistPage(c, accounts, localAccountByEmail, accessToken, page.value || [], folder);
+			received += pageResult.received;
+			skipped += pageResult.skipped;
+			url = page['@odata.nextLink'] || '';
+			deltaLink = page['@odata.deltaLink'] || deltaLink;
+		}
+		if (!deltaLink) throw new BizError('Microsoft Graph returned no delta cursor', 502);
+		await c.env.db.prepare(`INSERT INTO outlook_folder_state(outlook_connection_id, folder, delta_link) VALUES (?, ?, ?) ON CONFLICT(outlook_connection_id, folder) DO UPDATE SET delta_link = excluded.delta_link`).bind(connection.connection_id, folder, deltaLink).run();
+		return { received, skipped };
+	},
+
+	async persistPage(c, accounts, localAccountByEmail, accessToken, messages, folder) {
+		const validMessages = messages.filter(message => !message['@removed'] && message.id);
+		let skipped = messages.length - validMessages.length;
+		if (!validMessages.length || !accounts.length) return { received: 0, skipped: skipped + validMessages.length };
+
+		const accountIds = accounts.map(account => account.outlook_account_id);
+		const messageIds = validMessages.map(message => message.id);
+		const accountPlaceholders = accountIds.map(() => '?').join(',');
+		const messagePlaceholders = messageIds.map(() => '?').join(',');
+		const knownRows = (await c.env.db.prepare(`SELECT outlook_account_id, graph_message_id, folder FROM outlook_message WHERE outlook_account_id IN (${accountPlaceholders}) AND graph_message_id IN (${messagePlaceholders})`).bind(...accountIds, ...messageIds).all()).results;
+		const knownMessages = new Map(knownRows.map(row => [`${row.outlook_account_id}:${row.graph_message_id}`, row]));
+		const folderUpdates = [];
+		let received = 0;
+
+		for (const message of validMessages) {
+			const unseen = [];
+			for (const account of accounts) {
+				const known = knownMessages.get(`${account.outlook_account_id}:${message.id}`);
+				if (!known) unseen.push(account);
+				else if (known.folder !== folder) folderUpdates.push(c.env.db.prepare(`UPDATE outlook_message SET folder = ? WHERE outlook_account_id = ? AND graph_message_id = ?`).bind(folder, account.outlook_account_id, message.id));
+			}
+			if (!unseen.length) { skipped++; continue; }
+			const attachments = message.hasAttachments ? await this.loadAttachments(accessToken, message.id) : [];
+			for (const account of unseen) await this.persistMessage(c, account, localAccountByEmail.get(account.email.toLowerCase()), message, attachments, folder);
+			received += unseen.length;
+		}
+
+		if (folderUpdates.length) await c.env.db.batch(folderUpdates);
+		return { received, skipped };
+	},
+
+	async persistMessage(c, providerAccount, localAccount, message, attachments, folder) {
 		if (!localAccount) throw new BizError('Outlook local inbox account not found', 409);
 		const sender = message.from?.emailAddress || {};
 		const recipients = recipientList(message.toRecipients);
@@ -109,14 +151,12 @@ const outlookSyncService = {
 	},
 	async loadAttachments(accessToken, messageId) {
 		const response = await outlookGraphService.get(accessToken, outlookGraphService.attachmentUrl(messageId));
-		const attachments = [];
-		for (const item of response.value || []) {
-			if (!item.id || !String(item['@odata.type'] || '').includes('fileAttachment')) continue;
+		const fileAttachments = (response.value || []).filter(item => item.id && String(item['@odata.type'] || '').includes('fileAttachment'));
+		return mapConcurrent(fileAttachments, ATTACHMENT_DOWNLOAD_CONCURRENCY, async item => {
 			const content = await outlookGraphService.bytes(accessToken, outlookGraphService.attachmentValueUrl(messageId, item.id));
 			const filename = item.name || 'attachment';
-			attachments.push({ key: constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(content) + fileUtils.getExtFileName(filename), filename, mimeType: item.contentType || 'application/octet-stream', size: content.byteLength, content, contentId: item.contentId || null, disposition: item.isInline ? 'inline' : 'attachment', type: item.isInline ? attConst.type.EMBED : attConst.type.ATT });
-		}
-		return attachments;
+			return { key: constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(content) + fileUtils.getExtFileName(filename), filename, mimeType: item.contentType || 'application/octet-stream', size: content.byteLength, content, contentId: item.contentId || null, disposition: item.isInline ? 'inline' : 'attachment', type: item.isInline ? attConst.type.EMBED : attConst.type.ATT };
+		});
 	}
 };
 

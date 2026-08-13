@@ -3,8 +3,8 @@
     <div class="toolbar">
       <div><h2>{{ $t('outlookGroupManagement') }}</h2><p>{{ $t('outlookAccounts') }} / {{ $t('outlookTags') }}</p></div>
       <div class="actions">
-        <el-button v-perm="'outlook-group:add'" type="primary" @click="openGroup()">{{ $t('outlookNewGroup') }}</el-button>
-        <el-button v-perm="'outlook-tag:add'" @click="tagVisible = true">{{ $t('outlookManageTags') }}</el-button>
+        <el-button type="primary" @click="openGroup()">{{ $t('outlookNewGroup') }}</el-button>
+        <el-button @click="tagVisible = true">{{ $t('outlookManageTags') }}</el-button>
         <el-button @click="load"><Icon icon="ion:reload" /></el-button>
       </div>
     </div>
@@ -16,9 +16,9 @@
       <el-table-column prop="createTime" :label="$t('date')" min-width="180" />
       <el-table-column :label="$t('action')" width="240">
         <template #default="{ row }">
-          <el-button v-perm="'outlook-group:set'" size="small" @click="openMembers(row)">{{ $t('outlookManageMembers') }}</el-button>
-          <el-button v-perm="'outlook-group:set'" size="small" @click="openGroup(row)">{{ $t('change') }}</el-button>
-          <el-button v-perm="'outlook-group:delete'" size="small" type="danger" @click="deleteGroup(row)">{{ $t('delete') }}</el-button>
+          <el-button size="small" @click="openMembers(row)">{{ $t('outlookManageMembers') }}</el-button>
+          <el-button size="small" @click="openGroup(row)">{{ $t('change') }}</el-button>
+          <el-button size="small" type="danger" @click="deleteGroup(row)">{{ $t('delete') }}</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -42,7 +42,7 @@
     </el-dialog>
 
     <el-dialog v-model="tagVisible" :title="$t('outlookManageTags')" width="560" @closed="resetTagDialog">
-      <div v-perm="'outlook-tag:add'" class="tag-add">
+      <div class="tag-add">
         <el-input v-model="tagName" :placeholder="$t('outlookTagNamePlaceholder')" :disabled="tagAdding" @keyup.enter="createTag" />
         <el-button type="primary" :loading="tagAdding" :disabled="tagAdding" @click="createTag">{{ $t('outlookAddTag') }}</el-button>
       </div>
@@ -62,8 +62,8 @@
         <el-table-column prop="accountCount" :label="$t('outlookAccounts')" width="110" />
         <el-table-column :label="$t('action')" width="160">
           <template #default="{ row }">
-            <el-button v-perm="'outlook-tag:set'" size="small" :disabled="tagSavingId === row.outlookTagId" @click="startTagEdit(row)">{{ $t('change') }}</el-button>
-            <el-button v-perm="'outlook-tag:delete'" size="small" type="danger" :disabled="tagSavingId === row.outlookTagId" @click="deleteTag(row)">{{ $t('delete') }}</el-button>
+            <el-button size="small" :disabled="tagSavingId === row.outlookTagId" @click="startTagEdit(row)">{{ $t('change') }}</el-button>
+            <el-button size="small" type="danger" :disabled="tagSavingId === row.outlookTagId" @click="deleteTag(row)">{{ $t('delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
