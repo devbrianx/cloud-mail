@@ -18,6 +18,7 @@ app.get('/oauth/outlook/callback', async c => {
 	return c.html(`<!doctype html><script>window.opener?.postMessage(${result}, ${targetOrigin});window.close();</script>`);
 });
 app.post('/outlookAccount/import', async c => { const body = await c.req.json(); return c.json(result.ok(await outlookAccountService.importRows(c, userContext.getUserId(c), body.rows))); });
+app.post('/outlookAccount/export', async c => { let body; try { body = await c.req.json(); } catch { body = {}; } return c.json(result.ok(await outlookAccountService.exportRows(c, userContext.getUserId(c), body?.outlookAccountIds))); });
 app.put('/outlookAccount/set', async c => c.json(result.ok(await outlookAccountService.setOrganization(c, userContext.getUserId(c), await c.req.json()))));
 app.put('/outlookAccount/batchSetGroup', async c => { let body; try { body = await c.req.json(); } catch { body = {}; } return c.json(result.ok(await outlookAccountService.batchSetGroup(c, userContext.getUserId(c), body))); });
 app.delete('/outlookAccount/batchDelete', async c => { let body; try { body = await c.req.json(); } catch { body = {}; } return c.json(result.ok(await outlookAccountService.batchDelete(c, userContext.getUserId(c), body))); });

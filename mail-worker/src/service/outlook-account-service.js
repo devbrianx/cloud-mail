@@ -1,5 +1,6 @@
 import BizError from '../error/biz-error';
 import outlookCryptoService from './outlook-crypto-service';
+import { refreshCompatibleGraphToken } from './outlook-graph-service';
 import { isDel } from '../const/entity-const';
 
 const MAX_IMPORT_LINES = 100;
@@ -27,12 +28,15 @@ function randomState() {
 	return btoa(String.fromCharCode(...bytes)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
+
 async function tokenRequest(params, resource) {
 	const response = await fetch(microsoftTokenUrl, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params) });
 	const data = await response.json().catch(() => ({}));
 	if (!response.ok) {
 		const code = typeof data.error === 'string' ? data.error : 'request_failed';
-		throw new BizError(`Microsoft ${resource} token refresh failed (${code}); the client ID, refresh token, permissions, or client secret are invalid`, 400);
+		const description = typeof data.error_description === 'string' ? data.error_description.replace(/\s+/g, ' ').trim().slice(0, 500) : '';
+		if (description) throw new BizError(`Microsoft ${resource} authorization failed (${code}): ${description}`, 400);
+		throw new BizError(`Microsoft ${resource} authorization failed (${code})`, 400);
 	}
 	if (!data.access_token) throw new BizError(`Microsoft ${resource} authorization returned no access token`, 400);
 	return data;
@@ -166,12 +170,26 @@ const outlookAccountService = {
 				const [submittedEmail, ignoredPassword, clientId, refreshToken] = fields;
 				void ignoredPassword;
 				const email = normalizedEmail(submittedEmail);
-				const token = await tokenRequest({ grant_type: 'refresh_token', client_id: normalizedText(clientId, 'Outlook client ID'), ...(configuredClientSecret(c, clientId) ? { client_secret: configuredClientSecret(c, clientId) } : {}), refresh_token: normalizedText(refreshToken, 'Outlook refresh token'), scope: 'https://graph.microsoft.com/.default' }, 'Graph');
-				const account = await this.saveImportedAccount(c, userId, { email, profile: { email, userPrincipalName: '' }, clientId, clientSecret: configuredClientSecret(c, clientId), refreshToken: token.refresh_token || refreshToken });
+				const token = await refreshCompatibleGraphToken(c, { clientId: normalizedText(clientId, 'Outlook client ID'), clientSecret: configuredClientSecret(c, clientId), refreshToken: normalizedText(refreshToken, 'Outlook refresh token') });
+				const account = await this.saveImportedAccount(c, userId, { email, profile: { email, userPrincipalName: '' }, clientId, clientSecret: configuredClientSecret(c, clientId), refreshToken: token.refreshToken });
 				imported.push({ line: index + 1, ...account });
 			} catch (error) { failed.push({ line: index + 1, reason: error.message || 'Import failed' }); }
 		}
 		return { imported, failed };
+	},
+
+	async exportRows(c, userId, outlookAccountIds) {
+		const allAccounts = outlookAccountIds == null || (Array.isArray(outlookAccountIds) && !outlookAccountIds.length);
+		const accountIds = allAccounts ? [] : accountIdsOf(outlookAccountIds);
+		const filters = ['a.user_id = ?', 'a.is_del = 0', 'c.is_del = 0'];
+		const bindings = [userId];
+		if (accountIds.length) {
+			filters.push(`a.outlook_account_id IN (${accountIds.map(() => '?').join(',')})`);
+			bindings.push(...accountIds);
+		}
+		const rows = (await c.env.db.prepare(`SELECT a.email, c.client_id clientId, c.refresh_token_ciphertext refreshTokenCiphertext FROM outlook_account a JOIN outlook_connection c ON c.outlook_connection_id = a.outlook_connection_id WHERE ${filters.join(' AND ')} ORDER BY a.outlook_account_id DESC`).bind(...bindings).all()).results;
+		if (accountIds.length && rows.length !== accountIds.length) throw new BizError('Outlook account not found', 404);
+		return { rows: (await Promise.all(rows.map(async row => `${row.email}----x----${row.clientId}----${await outlookCryptoService.decrypt(c, row.refreshTokenCiphertext)}`))).join('\n') };
 	},
 
 	async setOrganization(c, userId, params) {

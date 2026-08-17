@@ -67,20 +67,20 @@ const outlookSyncService = {
 		await c.env.kv.put(lockKey, '1', { expirationTtl: LOCK_TTL_SECONDS });
 		try {
 			await c.env.db.prepare(`UPDATE outlook_connection SET sync_status = 'syncing', sync_error = '', update_time = CURRENT_TIMESTAMP WHERE outlook_connection_id = ?`).bind(connection.connection_id).run();
-			const accessToken = await outlookGraphService.refreshAccessToken(c, connection);
+			const session = await outlookGraphService.refreshAccessToken(c, connection);
 			const accounts = (await c.env.db.prepare(`SELECT * FROM outlook_account WHERE outlook_connection_id = ? AND user_id = ? AND is_del = 0`).bind(connection.connection_id, userId).all()).results;
 			const localAccounts = (await c.env.db.prepare(`SELECT account_id, email, name FROM account WHERE user_id = ? AND is_del = 0`).bind(userId).all()).results;
 			const localAccountByEmail = new Map(localAccounts.map(account => [account.email.toLowerCase(), account]));
 			const states = (await c.env.db.prepare(`SELECT folder, delta_link FROM outlook_folder_state WHERE outlook_connection_id = ?`).bind(connection.connection_id).all()).results;
 			const receivedAfter = new Date(Date.now() - INITIAL_SYNC_DAYS * 24 * 60 * 60 * 1000).toISOString();
-			const results = await Promise.all(GRAPH_FOLDERS.map(folder => this.syncFolder(c, connection, accounts, localAccountByEmail, accessToken, states, folder, receivedAfter)));
+			const results = await Promise.all(GRAPH_FOLDERS.map(folder => this.syncFolder(c, connection, accounts, localAccountByEmail, session, states, folder, receivedAfter)));
 			const received = results.reduce((total, result) => total + result.received, 0);
 			const skipped = results.reduce((total, result) => total + result.skipped, 0);
 			const lastSyncTime = new Date().toISOString();
 			await c.env.db.prepare(`UPDATE outlook_connection SET sync_status = 'ready', sync_error = '', last_sync_time = ?, update_time = CURRENT_TIMESTAMP WHERE outlook_connection_id = ?`).bind(lastSyncTime, connection.connection_id).run();
 			return { isOutlook: true, received, skipped, lastSyncTime };
 		} catch (error) {
-			const invalidCursor = error instanceof BizError && error.message === 'Microsoft Graph request failed';
+			const invalidCursor = error instanceof BizError && error.code === 410 && error.message.startsWith('Microsoft Graph request failed');
 			const syncError = invalidCursor ? 'Outlook sync cursor expired; refresh again to resync' : safeError(error);
 			if (invalidCursor) await c.env.db.prepare(`UPDATE outlook_folder_state SET delta_link = '' WHERE outlook_connection_id = ?`).bind(connection.connection_id).run();
 			await c.env.db.prepare(`UPDATE outlook_connection SET sync_status = ?, sync_error = ?, update_time = CURRENT_TIMESTAMP WHERE outlook_connection_id = ?`).bind(invalidCursor ? 'ready' : 'error', syncError, connection.connection_id).run();
@@ -88,14 +88,14 @@ const outlookSyncService = {
 		} finally { await c.env.kv.delete(lockKey); }
 	},
 
-	async syncFolder(c, connection, accounts, localAccountByEmail, accessToken, states, folder, receivedAfter) {
+	async syncFolder(c, connection, accounts, localAccountByEmail, session, states, folder, receivedAfter) {
 		let url = states.find(state => state.folder === folder)?.delta_link || outlookGraphService.initialDeltaUrl(folder === 'junkemail' ? 'JunkEmail' : 'Inbox', receivedAfter);
 		let deltaLink = '';
 		let received = 0;
 		let skipped = 0;
 		while (url) {
-			const page = await outlookGraphService.get(accessToken, url);
-			const pageResult = await this.persistPage(c, accounts, localAccountByEmail, accessToken, page.value || [], folder);
+			const page = await outlookGraphService.get(c, session, url);
+			const pageResult = await this.persistPage(c, accounts, localAccountByEmail, session, page.value || [], folder);
 			received += pageResult.received;
 			skipped += pageResult.skipped;
 			url = page['@odata.nextLink'] || '';
@@ -106,7 +106,7 @@ const outlookSyncService = {
 		return { received, skipped };
 	},
 
-	async persistPage(c, accounts, localAccountByEmail, accessToken, messages, folder) {
+	async persistPage(c, accounts, localAccountByEmail, session, messages, folder) {
 		const validMessages = messages.filter(message => !message['@removed'] && message.id);
 		let skipped = messages.length - validMessages.length;
 		if (!validMessages.length || !accounts.length) return { received: 0, skipped: skipped + validMessages.length };
@@ -128,7 +128,7 @@ const outlookSyncService = {
 				else if (known.folder !== folder) folderUpdates.push(c.env.db.prepare(`UPDATE outlook_message SET folder = ? WHERE outlook_account_id = ? AND graph_message_id = ?`).bind(folder, account.outlook_account_id, message.id));
 			}
 			if (!unseen.length) { skipped++; continue; }
-			const attachments = message.hasAttachments ? await this.loadAttachments(accessToken, message.id) : [];
+			const attachments = message.hasAttachments ? await this.loadAttachments(c, session, message.id) : [];
 			for (const account of unseen) await this.persistMessage(c, account, localAccountByEmail.get(account.email.toLowerCase()), message, attachments, folder);
 			received += unseen.length;
 		}
@@ -149,11 +149,11 @@ const outlookSyncService = {
 			await c.env.db.prepare(`INSERT INTO outlook_message(outlook_account_id, graph_message_id, email_id, folder) VALUES (?, ?, ?, ?)`).bind(providerAccount.outlook_account_id, message.id, row.emailId, folder).run();
 		} catch (error) { await c.env.db.prepare(`DELETE FROM email WHERE email_id = ?`).bind(row.emailId).run(); throw error; }
 	},
-	async loadAttachments(accessToken, messageId) {
-		const response = await outlookGraphService.get(accessToken, outlookGraphService.attachmentUrl(messageId));
+	async loadAttachments(c, session, messageId) {
+		const response = await outlookGraphService.get(c, session, outlookGraphService.attachmentUrl(messageId));
 		const fileAttachments = (response.value || []).filter(item => item.id && String(item['@odata.type'] || '').includes('fileAttachment'));
 		return mapConcurrent(fileAttachments, ATTACHMENT_DOWNLOAD_CONCURRENCY, async item => {
-			const content = await outlookGraphService.bytes(accessToken, outlookGraphService.attachmentValueUrl(messageId, item.id));
+			const content = await outlookGraphService.bytes(c, session, outlookGraphService.attachmentValueUrl(messageId, item.id));
 			const filename = item.name || 'attachment';
 			return { key: constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(content) + fileUtils.getExtFileName(filename), filename, mimeType: item.contentType || 'application/octet-stream', size: content.byteLength, content, contentId: item.contentId || null, disposition: item.isInline ? 'inline' : 'attachment', type: item.isInline ? attConst.type.EMBED : attConst.type.ATT };
 		});

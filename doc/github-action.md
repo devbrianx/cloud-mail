@@ -25,7 +25,7 @@
 
 在 Microsoft Entra 中注册 Web 应用，添加重定向 URI：`https://<CUSTOM_DOMAIN>/api/oauth/outlook/callback`；未配置自定义域名时，使用部署产生的 `https://<worker>.workers.dev/api/oauth/outlook/callback`。为该应用配置 Microsoft Graph 委托权限 `User.Read` 与 `Mail.Read`；运行时会请求 `offline_access` 以获得刷新令牌。`OUTLOOK_CLIENT_ID` 和 `OUTLOOK_CLIENT_SECRET` 必须同时设置。
 
-批量导入的 Graph `refresh_token` 对应的应用注册及用户授权必须包含 `Mail.Read`。`https://graph.microsoft.com/.default` 只会请求该 `client_id` 已配置并已同意的权限，不会自动添加 `Mail.Read`。批量导入不调用 `GET /me`，因此不要求 `User.Read`；填写的邮箱必须就是该 `refresh_token` 对应的邮箱，首次同步会使用 `Mail.Read` 访问该邮箱。
+批量导入格式为 `邮箱----密码----client_id----refresh_token`。`client_id` 必须是签发该 `refresh_token` 的同一 Microsoft Entra 应用注册的应用程序（客户端）ID；邮箱必须就是该令牌对应的邮箱。第二个“密码”字段仅为兼容账号池导出格式而保留，导入时会被丢弃且不会保存。若此应用是机密客户端，部署时必须把 `OUTLOOK_CLIENT_ID` 配置为该完全相同的 ID，并把 `OUTLOOK_CLIENT_SECRET` 配置为该应用当前有效的客户端密码；Worker 仅在导入行的 `client_id` 与已部署的 `OUTLOOK_CLIENT_ID` 完全一致时才会发送该密钥。对应的应用注册及用户授权必须包含 Microsoft Graph 委托权限 `Mail.Read`。刷新时 Worker 先请求 `https://graph.microsoft.com/.default` 以兼容原账号池授权；仅当 Microsoft 返回 `AADSTS90023` 时，才回退为 `https://graph.microsoft.com/Mail.Read`。批量导入不调用 `GET /me`，因此不要求 `User.Read`；首次同步会使用 Graph 邮件权限访问该邮箱。
 
 ---
 

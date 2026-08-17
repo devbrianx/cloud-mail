@@ -5,11 +5,13 @@
       <div class="actions">
         <el-button type="primary" :loading="authorizing" @click="authorize">{{ $t('outlookAuthorize') }}</el-button>
         <el-button @click="importVisible = true">{{ $t('outlookImport') }}</el-button>
+        <el-button :loading="exporting" @click="exportAccounts()">{{ $t('outlookExportAll') }}</el-button>
         <el-button @click="load"><Icon icon="ion:reload" /></el-button>
       </div>
     </div>
     <div v-if="selectedIds.length" class="batch-actions">
       <span>{{ $t('outlookSelectedCount', { count: selectedIds.length }) }}</span>
+      <el-button size="small" :loading="exporting" @click="exportAccounts(selectedIds)">{{ $t('outlookExportSelected') }}</el-button>
       <el-button size="small" @click="openBatchGroup">{{ $t('outlookBatchSetGroup') }}</el-button>
       <el-button size="small" type="danger" @click="batchRemove">{{ $t('outlookBatchDelete') }}</el-button>
     </div>
@@ -46,7 +48,7 @@ import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { Icon } from '@iconify/vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useI18n } from 'vue-i18n';
-import { outlookAccountBatchDelete, outlookAccountBatchSetGroup, outlookAccountDelete, outlookAccountImport, outlookAccountList, outlookAccountSet, outlookOAuthStart } from '@/request/outlook-account.js';
+import { outlookAccountBatchDelete, outlookAccountBatchSetGroup, outlookAccountDelete, outlookAccountExport, outlookAccountImport, outlookAccountList, outlookAccountSet, outlookOAuthStart } from '@/request/outlook-account.js';
 import { outlookGroupList } from '@/request/outlook-group.js';
 import { outlookTagList } from '@/request/outlook-tag.js';
 import { useAccountStore } from '@/store/account.js';
@@ -68,6 +70,7 @@ const organizationVisible = ref(false);
 const batchGroupVisible = ref(false);
 const authorizing = ref(false);
 const importing = ref(false);
+const exporting = ref(false);
 const saving = ref(false);
 const selected = ref(null);
 const importRows = ref('');
@@ -186,6 +189,33 @@ async function importAccounts() {
     }
   } finally {
     importing.value = false;
+  }
+}
+function exportFilename(selected) {
+  const now = new Date();
+  const timestamp = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('') + '-' + [String(now.getHours()).padStart(2, '0'), String(now.getMinutes()).padStart(2, '0'), String(now.getSeconds()).padStart(2, '0')].join('');
+  return `outlook-accounts${selected ? '-selected' : ''}-${timestamp}.txt`;
+}
+
+async function exportAccounts(outlookAccountIds = []) {
+  if (exporting.value) return;
+  exporting.value = true;
+  try {
+    const { rows } = await outlookAccountExport(outlookAccountIds);
+    if (!rows) {
+      ElMessage.info(t('outlookExportEmpty'));
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([rows], { type: 'text/plain;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = exportFilename(outlookAccountIds.length > 0);
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  } finally {
+    exporting.value = false;
   }
 }
 
